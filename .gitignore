@@ -55,3 +55,15 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+*.log
+npm-debug.log*
+
+# Local SQLite database (migrations are committed, the .db file is not)
+*.db
+*.db-shm
+*.db-wal
