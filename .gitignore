@@ -67,3 +67,10 @@ npm-debug.log*
 *.db
 *.db-shm
 *.db-wal
+
+# IDE / user-specific files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
