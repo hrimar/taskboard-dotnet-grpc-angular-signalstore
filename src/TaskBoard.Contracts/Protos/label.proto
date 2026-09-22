@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package taskboard.v1;
+
+import "google/protobuf/empty.proto";
+
+option csharp_namespace = "TaskBoard.Contracts.V1";
+
+message Label{
+	 int32 id = 1;
+	 string name = 2;
+	 string color = 3; // #FF8800
+}
+
+// The service definition.
+service LabelService  {
+    // Create
+    rpc CreateLabel(CreateLabelRequest) returns (Label);
+
+    // Read single
+    rpc GetLabel(GetLabelRequest) returns (Label);
+
+    // Read list
+    rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse);
+
+    // Update
+    rpc UpdateLabel(UpdateLabelRequest) returns (Label);
+
+    // Delete
+    rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty);
+}
+
+// The request message
+message CreateLabelRequest {
+  string name = 1;
+  string color = 2;
+}
+
+message GetLabelRequest {
+  int32 id = 1;
+}
+
+message ListLabelsRequest {}
+
+message UpdateLabelRequest {
+  int32 id = 1;
+  string name = 2;
+  string color = 3;
+}
+
+message DeleteLabelRequest {
+  int32 id = 1;
+}
+
+// The response message.
+message ListLabelsResponse  {
+  repeated Label labels = 1;
+}
