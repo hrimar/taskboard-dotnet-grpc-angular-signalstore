@@ -1,9 +1,14 @@
+using Microsoft.EntityFrameworkCore;
 using TaskBoard.Api.Services;
+using TaskBoard.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddGrpc();
+
+builder.Services.AddDbContext<TaskBoardDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("TaskBoard")));
 
 var app = builder.Build();
 
