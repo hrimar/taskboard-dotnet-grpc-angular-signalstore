@@ -56,7 +56,7 @@ message DeleteBoardRequest {
 
 // The response message
 message ListBoardsResponse  {
-  repeated Board board = 1;
+  repeated Board boards = 1;
 }
 
 
