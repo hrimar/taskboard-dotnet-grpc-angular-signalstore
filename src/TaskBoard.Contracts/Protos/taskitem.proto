@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package taskboard.v1;
+
+import "google/protobuf/empty.proto"; 
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/field_mask.proto";
+
+option csharp_namespace = "TaskBoard.Contracts.V1";
+
+message TaskItem {
+  int32 id = 1;
+  int32 board_id = 2;
+  string title = 3;
+  string description = 4;
+  TaskItemStatus status = 5;
+  TaskItemPriority priority = 6;
+  optional google.protobuf.Timestamp due_date = 7;
+  repeated int32 label_ids = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+service TaskItemService {
+  rpc CreateTaskItem(CreateTaskItemRequest) returns (TaskItem);
+  rpc GetTaskItem(GetTaskItemRequest) returns (TaskItem);
+  rpc ListTaskItems(ListTaskItemsRequest) returns (ListTaskItemsResponse);
+  rpc UpdateTaskItem(UpdateTaskItemRequest) returns (TaskItem);
+  rpc DeleteTaskItem(DeleteTaskItemRequest) returns (google.protobuf.Empty);
+}
+
+//
+enum TaskItemStatus {
+  TASK_ITEM_STATUS_UNSPECIFIED = 0;   // the first value in the enum must be zero because of the way protobuf handles default values
+  TASK_ITEM_STATUS_TODO = 1;
+  TASK_ITEM_STATUS_IN_PROGRESS = 2;
+  TASK_ITEM_STATUS_DONE = 3;
+}
+
+enum TaskItemPriority {
+  TASK_ITEM_PRIORITY_UNSPECIFIED = 0;
+  TASK_ITEM_PRIORITY_LOW = 1;
+  TASK_ITEM_PRIORITY_MEDIUM = 2;
+  TASK_ITEM_PRIORITY_HIGH = 3;
+}
+
+message CreateTaskItemRequest {
+  int32 board_id = 1;
+  string title = 2;
+  optional string description = 3;
+  TaskItemStatus status = 4;
+  TaskItemPriority priority = 5;
+  optional google.protobuf.Timestamp due_date = 6;
+  repeated int32 label_ids = 7;
+}
+
+message GetTaskItemRequest {
+	int32 id = 1;
+}
+
+message DeleteTaskItemRequest {
+  int32 id = 1;
+}
+
+message ListTaskItemsRequest {
+  int32 board_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListTaskItemsResponse {
+  repeated TaskItem task_items = 1;
+  string next_page_token = 2;
+}
+
+message UpdateTaskItemRequest {
+  int32 id = 1;
+  TaskItem task_item = 2;							 // tesk with the updated values
+  google.protobuf.FieldMask update_mask = 3; // fields to update
+}
