@@ -1,0 +1,62 @@
+﻿syntax = "proto3";
+
+package taskboard.v1;
+
+import "google/protobuf/empty.proto"; 
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "TaskBoard.Contracts.V1";
+
+message Board {
+  int32 id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// The service definition
+service BoardService  {
+    // Create
+    rpc CreateBoard(CreateBoardRequest) returns (Board);
+
+    // Read single
+    rpc GetBoard(GetBoardRequest) returns (Board);
+
+    // Read list
+    rpc ListBoards(ListBoardsRequest) returns (ListBoardsResponse);
+
+    // Update
+    rpc UpdateBoard(UpdateBoardRequest) returns (Board);
+
+    // Delete
+    rpc DeleteBoard(DeleteBoardRequest) returns (google.protobuf.Empty);
+}
+
+// The request messages
+message CreateBoardRequest {
+	string name = 1;
+	optional string description = 2;
+}
+
+message GetBoardRequest {
+	int32 id = 1;
+}
+
+message ListBoardsRequest {}
+
+message UpdateBoardRequest {
+	int32 id = 1;
+	optional string name = 2;
+	optional string description = 3;
+}
+
+message DeleteBoardRequest {
+	int32 id = 1;
+}
+
+// The response message
+message ListBoardsResponse  {
+  repeated Board board = 1;
+}
+
+
