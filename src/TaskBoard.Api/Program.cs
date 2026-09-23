@@ -12,15 +12,20 @@ builder.Services.AddGrpc();
 builder.Services.AddDbContext<TaskBoardDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("TaskBoard")));
 
-// The Angular dev server (ng serve) runs on a different origin (localhost:4200) than the
-// API (localhost:5xxx/7xxx), so the browser enforces CORS. gRPC-Web additionally relies on
-// two custom response headers the browser would otherwise hide from the JS client, so they
-// must be explicitly exposed - without this, every call fails with an unreadable status.
+// The Angular client runs on a different origin than the API, so the browser enforces CORS.
+// The allowed origin(s) come from configuration (appsettings.Development.json for "ng serve"
+// on localhost:4200; a real deployment would set its own origin via appsettings.Production.json
+// or an environment variable) instead of being hardcoded here.
+// gRPC-Web additionally relies on custom response headers the browser would otherwise hide
+// from the JS client, so they must be explicitly exposed - without this, every call fails
+// with an unreadable status.
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(AngularDevClient, policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader()
             .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding");
