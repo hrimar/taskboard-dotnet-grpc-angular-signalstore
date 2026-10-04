@@ -40,3 +40,8 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Generated from ../../src/TaskBoard.Contracts/Protos/*.proto by `npm run proto:gen`,
+# which also runs automatically before `start`/`build` (see package.json). Regenerated,
+# not hand-edited - same reasoning as bin/obj on the .NET side.
+/src/app/core/proto-gen/
