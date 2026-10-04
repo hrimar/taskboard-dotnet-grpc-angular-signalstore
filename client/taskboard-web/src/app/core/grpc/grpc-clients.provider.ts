@@ -12,6 +12,7 @@ const transport = new GrpcWebFetchTransport({
   baseUrl: environment.apiUrl
 });
 
+// // BoardServiceClient is generated from the protobuf-ts when npm run proto:gen is called by tools/generate-proto.mjs script.
 export const BOARD_CLIENT = new InjectionToken<BoardServiceClient>('BOARD_CLIENT');
 export const LABEL_CLIENT = new InjectionToken<LabelServiceClient>('LABEL_CLIENT');
 export const TASK_ITEM_CLIENT = new InjectionToken<TaskItemServiceClient>('TASK_ITEM_CLIENT');

@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { BOARD_CLIENT } from './core/grpc/grpc-clients.provider';
+// import { BOARD_CLIENT } from './core/grpc/grpc-clients.provider';
+import { BoardsStore } from './boards/data-access/boards.store';
 
 @Component({
   selector: 'app-root',
@@ -12,14 +13,18 @@ import { BOARD_CLIENT } from './core/grpc/grpc-clients.provider';
 export class AppComponent implements OnInit {
   title = 'taskboard-web';
 
-  // TEMPORARY: proves the Angular -> gRPC-Web -> API wire-up end to end
-  // (CORS, Kestrel protocols, transport baseUrl) before the SignalStore step
-  // replaces this with real state management.
-  private readonly boardClient = inject(BOARD_CLIENT);
+  // // TEMPORARY: proves the Angular -> gRPC-Web -> API wire-up end to end
+  // // (CORS, Kestrel protocols, transport baseUrl) before the SignalStore step
+  // // replaces this with real state management.
+  // private readonly boardClient = inject(BOARD_CLIENT);
+  // TEMPORARY: proves BoardsStore's signals update the template end to end -
+  // a real Boards feature component (with Material UI) replaces this in the next step.
+  protected readonly boardsStore = inject(BoardsStore);
 
   ngOnInit(): void {
-    this.boardClient.listBoards({}).response
-      .then((res) => console.log('[gRPC-Web smoke test] ListBoards succeeded:', res.boards))
-      .catch((err) => console.error('[gRPC-Web smoke test] ListBoards failed:', err));
+    // this.boardClient.listBoards({}).response
+    //   .then((res) => console.log('[gRPC-Web smoke test] ListBoards succeeded:', res.boards))
+    //   .catch((err) => console.error('[gRPC-Web smoke test] ListBoards failed:', err));
+    this.boardsStore.loadBoards();
   }
 }
