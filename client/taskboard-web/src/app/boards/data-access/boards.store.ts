@@ -3,7 +3,7 @@ import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { setAllEntities, withEntities, addEntity } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { tapResponse } from '@ngrx/operators';
-import { from, pipe, switchMap, tap } from 'rxjs';
+import { exhaustMap, from, pipe, switchMap, tap } from 'rxjs';
 import { RpcError } from '@protobuf-ts/runtime-rpc';
 import { BOARD_CLIENT } from '../../core/grpc/grpc-clients.provider';
 import type { Board, CreateBoardRequest } from '../../core/proto-gen/board';
@@ -54,10 +54,14 @@ export const BoardsStore = signalStore(
     ),
 
     // Command: takes a value (the new board's data) rather than void.
+    // exhaustMap, not switchMap: switchMap would cancel the first create on the client when a
+    // second one arrives, yet the server has already received (and persists) it - the board
+    // would exist but never show up in the list. exhaustMap ignores a new create while one
+    // is running, so what the user sees always matches what the server did.
     createBoard: rxMethod<CreateBoardRequest>(
       pipe(
         tap(() => patchState(store, { loading: true, error: null })),
-        switchMap((request) =>
+        exhaustMap((request) =>
           from(boardClient.createBoard(request).response).pipe(
             tapResponse({
               // No second ListBoards round-trip: the server's response already *is*

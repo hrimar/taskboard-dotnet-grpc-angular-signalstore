@@ -93,6 +93,27 @@ describe('BoardsStore', () => {
     expect(store.loading()).toBeFalse();
   });
 
+  it('should ignore a second create while the first is in flight instead of dropping the first', async () => {
+    // Held open by hand so the second call arrives while the first is still pending.
+    let resolveFirst!: (value: Board) => void;
+    const first = board(1, 'First');
+    fakeClient.createBoard.and.returnValues(
+      { response: new Promise<Board>((resolve) => (resolveFirst = resolve)) },
+      ok(board(2, 'Second'))
+    );
+    const store = TestBed.inject(BoardsStore);
+
+    store.createBoard({ name: 'First' });
+    store.createBoard({ name: 'Second' });
+    resolveFirst(first);
+    await settle();
+
+    // With switchMap the first response would be discarded and the server called twice -
+    // the first board would exist on the server but never reach the list.
+    expect(fakeClient.createBoard).toHaveBeenCalledTimes(1);
+    expect(store.entities()).toEqual([first]);
+  });
+
   it('should set the error and add nothing when create fails', async () => {
     fakeClient.createBoard.and.returnValue(fail('Name is required'));
     const store = TestBed.inject(BoardsStore);
