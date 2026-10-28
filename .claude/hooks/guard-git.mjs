@@ -7,7 +7,12 @@ import { readFileSync } from 'node:fs';
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const command = input.tool_input?.command ?? '';
 
-if (/\bgit\s+(commit|push|reset|rebase|merge|revert)\b/.test(command)) {
+// Global options may sit between `git` and the subcommand - `git -C "<repo path>" commit` is
+// a common form here because the repo path contains spaces - so they are skipped explicitly.
+const gitHistoryChange = /\bgit(\s+(-C|-c)\s+("[^"]*"|'[^']*'|\S+)|\s+--?[\w-]+(=\S+)?)*\s+(commit|push|reset|rebase|merge|revert)\b/;
+const ghMerge = /\bgh\s+pr\s+merge\b/;
+
+if (gitHistoryChange.test(command) || ghMerge.test(command)) {
   console.log(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',

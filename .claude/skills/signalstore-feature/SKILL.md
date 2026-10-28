@@ -22,7 +22,7 @@ export const TasksStore = signalStore(
 - **Query** methods: `rxMethod<void | Params>(pipe(tap(set loading), switchMap(...)))` - `switchMap` cancels a stale request when a newer one starts.
 - **Command** methods: use `concatMap` when order matters (sequential edits of one entity), `mergeMap` for independent ones; `exhaustMap` to ignore double-clicks on create.
 - Every client call: `from(client.method(request).response).pipe(tapResponse({ next, error }))`. Never let an error reach the outer pipe - it completes the `rxMethod` and every later call silently does nothing.
-- Errors: `toErrorMessage(error)` (uses `RpcError.message`); always reset `loading` in both branches.
+- Errors: `toErrorMessage(error)` (uses `RpcError.message`); always reset `loading` in both branches. It is currently a private function in `boards.store.ts` - when a second store needs it, move it to `core/grpc/rpc-error.ts` and import it from both, rather than copying it.
 - Entities: `setAllEntities`, `addEntity`, `updateEntity({ id, changes })`, `removeEntity(id)` from `@ngrx/signals/entities` - no manual array manipulation.
 - **Optimistic update** (status change, delete):
   ```ts

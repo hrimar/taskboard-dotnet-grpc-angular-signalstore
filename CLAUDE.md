@@ -31,7 +31,7 @@ npm test                  # Karma/Jasmine
 npx ng test --watch=false --browsers=ChromeHeadless --include src/app/boards/**/*.spec.ts   # single spec / folder
 ```
 
-There are no backend tests yet; tests (xUnit, Playwright) and CI are planned.
+CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. There are no backend test projects yet, so the backend job is currently a build check; xUnit and Playwright tests are planned.
 
 ## Architecture
 

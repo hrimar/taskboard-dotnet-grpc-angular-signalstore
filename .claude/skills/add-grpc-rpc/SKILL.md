@@ -25,7 +25,7 @@ Add `ToProto` / `ToDomain` / `ApplyTo` for new messages or fields. DB lookups (e
 ## 4. Service - `src/TaskBoard.Api/Services/<Entity>GrpcService.cs`
 - `public override async Task<TResponse> RpcName(TRequest request, ServerCallContext context)`.
 - Validate input first -> `RpcException(new Status(StatusCode.InvalidArgument, "..."))`; missing entity -> `NotFound`.
-- Pass `context.CancellationToken` to EF Core calls.
+- Pass `context.CancellationToken` to EF Core calls, so a cancelled call or an expired client deadline stops the query. (The first CRUD services predate this rule and don't do it yet - follow the rule in new code, not that example.)
 - New service class? Register it with `app.MapGrpcService<T>()` in `Program.cs`.
 - `dotnet build TaskBoard.sln`.
 
