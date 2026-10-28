@@ -1,0 +1,42 @@
+# Continuous integration only (no deployment): proves every PR builds and passes its tests
+# on a clean machine, independent of anything installed or generated locally.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same PR cancels the run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore TaskBoard.sln
+      - run: dotnet build TaskBoard.sln --no-restore --configuration Release
+      - run: dotnet test TaskBoard.sln --no-build --configuration Release
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client/taskboard-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/taskboard-web/package-lock.json
+      - run: npm ci
+      # prebuild runs proto:gen, so this also verifies the TS clients generate from the .proto files.
+      - run: npm run build
+      - run: npx ng test --watch=false --browsers=ChromeHeadless
