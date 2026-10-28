@@ -1,0 +1,39 @@
+# Automatic AI review of every new pull request.
+# Runs only when a PR is opened or marked ready - not on every push - to save the
+# Claude Pro usage quota behind CLAUDE_CODE_OAUTH_TOKEN. Ask for a re-review with "@claude" (see claude.yml).
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. CLAUDE.md describes the architecture and conventions;
+            .claude/agents/code-reviewer.md contains the project's review checklist - apply it.
+            Focus on correctness bugs, gRPC contract compatibility, status-code error handling,
+            SignalStore error/rollback handling and missing tests. Skip style nitpicks.
+
+            Use inline comments for issues tied to specific lines, and finish with one
+            summary comment on the PR (verdict + findings grouped as Must fix / Should fix).
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

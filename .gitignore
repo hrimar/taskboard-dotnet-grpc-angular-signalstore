@@ -74,3 +74,13 @@ npm-debug.log*
 .idea/
 *.user
 *.suo
+
+# Claude Code - personal settings/memory stay local; shared .claude/ config is committed
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Local working documents (not part of the project deliverable)
+docs/exam/
+docs/*.docx
+docs/Taskboard-gRPC-Angular-ClaudeCode-Plan1.md
+docs/Taskboard-gRPC-Angular-ClaudeCode-Plan2.md
