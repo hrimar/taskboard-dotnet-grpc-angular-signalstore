@@ -1,12 +1,12 @@
 import { inject } from '@angular/core';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
-import { setAllEntities, withEntities, addEntity } from '@ngrx/signals/entities';
+import { setAllEntities, setEntity, updateEntity, removeEntity, withEntities, addEntity } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { tapResponse } from '@ngrx/operators';
-import { exhaustMap, from, pipe, switchMap, tap } from 'rxjs';
+import { concatMap, exhaustMap, from, pipe, switchMap, tap } from 'rxjs';
 import { RpcError } from '@protobuf-ts/runtime-rpc';
 import { BOARD_CLIENT } from '../../core/grpc/grpc-clients.provider';
-import type { Board, CreateBoardRequest } from '../../core/proto-gen/board';
+import type { Board, CreateBoardRequest, DeleteBoardRequest, UpdateBoardRequest } from '../../core/proto-gen/board';
 
 interface BoardsStatus {
   loading: boolean;
@@ -20,6 +20,15 @@ const initialStatus: BoardsStatus = { loading: false, error: null };
 // falling back to a generic message for anything else (network failure, CORS, ...).
 function toErrorMessage(error: unknown): string {
   return error instanceof RpcError ? error.message : 'Unexpected error calling the API.';
+}
+
+// Only the fields the caller actually set. UpdateBoardRequest uses proto3 `optional`, where an
+// unset field means "leave unchanged" - copying `undefined` over the entity would blank it.
+function toChanges(request: UpdateBoardRequest): Partial<Board> {
+  const changes: Partial<Board> = {};
+  if (request.name !== undefined) changes.name = request.name;
+  if (request.description !== undefined) changes.description = request.description;
+  return changes;
 }
 
 // withEntities stores `boards` as a normalized { ids: number[], entityMap: Record<number, Board> }
@@ -71,6 +80,67 @@ export const BoardsStore = signalStore(
             })
           )
         )
+      )
+    ),
+
+    // Optimistic command: the change shows up immediately, then is confirmed or rolled back.
+    // No `loading` flag - the UI should feel instant, not flash a spinner for every edit.
+    // concatMap (not switchMap/exhaustMap): every edit must reach the server, in order, and
+    // each one snapshots the board *when it starts*, so a rollback never undoes an earlier
+    // edit that already succeeded.
+    updateBoard: rxMethod<UpdateBoardRequest>(
+      pipe(
+        concatMap((request) => {
+          const previous = store.entityMap()[request.id];
+          patchState(store, { error: null });
+          if (previous) {
+            patchState(store, updateEntity({ id: request.id, changes: toChanges(request) }));
+          }
+
+          return from(boardClient.updateBoard(request).response).pipe(
+            tapResponse({
+              // The server's copy is the truth (it may normalize values), so replace the guess.
+              next: (board) => patchState(store, setEntity(board)),
+              error: (error: unknown) => {
+                if (previous) patchState(store, setEntity(previous));
+                patchState(store, { error: toErrorMessage(error) });
+              }
+            })
+          );
+        })
+      )
+    ),
+
+    // Optimistic delete, same reasoning as updateBoard (concatMap, no loading flag).
+    // The extra twist is the rollback: setEntity alone would append the board to the end of
+    // `ids`, so a failed delete would make it jump to the bottom of the list. The original
+    // index is remembered and the id is spliced back to that spot.
+    deleteBoard: rxMethod<DeleteBoardRequest>(
+      pipe(
+        concatMap((request) => {
+          const previous = store.entityMap()[request.id];
+          const previousIndex = store.ids().indexOf(request.id);
+          patchState(store, { error: null });
+          if (previous) {
+            patchState(store, removeEntity(request.id));
+          }
+
+          return from(boardClient.deleteBoard(request).response).pipe(
+            tapResponse({
+              // Nothing to do on success - the board is already gone from the list.
+              next: () => undefined,
+              error: (error: unknown) => {
+                if (previous) {
+                  patchState(store, setEntity(previous));
+                  const ids = store.ids().filter((id) => id !== request.id);
+                  ids.splice(Math.min(previousIndex, ids.length), 0, request.id);
+                  patchState(store, { ids });
+                }
+                patchState(store, { error: toErrorMessage(error) });
+              }
+            })
+          );
+        })
       )
     )
   }))

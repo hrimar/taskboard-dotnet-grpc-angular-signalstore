@@ -5,7 +5,12 @@ import type { Board } from '../../core/proto-gen/board';
 import { BoardsStore } from './boards.store';
 
 describe('BoardsStore', () => {
-  let fakeClient: { listBoards: jasmine.Spy; createBoard: jasmine.Spy };
+  let fakeClient: {
+    listBoards: jasmine.Spy;
+    createBoard: jasmine.Spy;
+    updateBoard: jasmine.Spy;
+    deleteBoard: jasmine.Spy;
+  };
 
   const board = (id: number, name: string): Board => ({ id, name, description: '' });
 
@@ -20,7 +25,9 @@ describe('BoardsStore', () => {
   beforeEach(() => {
     fakeClient = {
       listBoards: jasmine.createSpy('listBoards'),
-      createBoard: jasmine.createSpy('createBoard')
+      createBoard: jasmine.createSpy('createBoard'),
+      updateBoard: jasmine.createSpy('updateBoard'),
+      deleteBoard: jasmine.createSpy('deleteBoard')
     };
     TestBed.configureTestingModule({ providers: [{ provide: BOARD_CLIENT, useValue: fakeClient }] });
   });
@@ -124,5 +131,159 @@ describe('BoardsStore', () => {
     expect(store.error()).toBe('Name is required');
     expect(store.entities()).toEqual([]);
     expect(store.loading()).toBeFalse();
+  });
+
+  describe('updateBoard', () => {
+    // Loads two boards so each test starts from a known list.
+    const loadedStore = async () => {
+      fakeClient.listBoards.and.returnValue(ok({ boards: [board(1, 'Alpha'), board(2, 'Beta')] }));
+      const store = TestBed.inject(BoardsStore);
+      store.loadBoards();
+      await settle();
+      return store;
+    };
+
+    it('should show the change immediately, before the server answers', async () => {
+      const store = await loadedStore();
+      fakeClient.updateBoard.and.returnValue({ response: new Promise<Board>(() => {}) });
+
+      store.updateBoard({ id: 1, name: 'Renamed' });
+
+      expect(store.entityMap()[1].name).toBe('Renamed');
+      // Optimistic edits must not flash the list-level spinner.
+      expect(store.loading()).toBeFalse();
+    });
+
+    it('should replace the optimistic guess with the server copy on success', async () => {
+      const store = await loadedStore();
+      fakeClient.updateBoard.and.returnValue(ok(board(1, 'Renamed by server')));
+
+      store.updateBoard({ id: 1, name: 'Renamed' });
+      await settle();
+
+      expect(store.entityMap()[1].name).toBe('Renamed by server');
+      expect(store.error()).toBeNull();
+    });
+
+    it('should roll back to the previous board and set the error when the update fails', async () => {
+      const store = await loadedStore();
+      fakeClient.updateBoard.and.returnValue(fail('Board 1 not found.'));
+
+      store.updateBoard({ id: 1, name: 'Renamed' });
+      expect(store.entityMap()[1].name).toBe('Renamed');
+      await settle();
+
+      expect(store.entityMap()[1]).toEqual(board(1, 'Alpha'));
+      expect(store.error()).toBe('Board 1 not found.');
+    });
+
+    it('should leave fields the request did not set untouched', async () => {
+      fakeClient.listBoards.and.returnValue(ok({ boards: [{ ...board(1, 'Alpha'), description: 'keep me' }] }));
+      const store = TestBed.inject(BoardsStore);
+      store.loadBoards();
+      await settle();
+      fakeClient.updateBoard.and.returnValue({ response: new Promise<Board>(() => {}) });
+
+      store.updateBoard({ id: 1, name: 'Renamed' });
+
+      expect(store.entityMap()[1].description).toBe('keep me');
+    });
+
+    it('should still call the server and surface the error for a board it does not know', async () => {
+      const store = await loadedStore();
+      fakeClient.updateBoard.and.returnValue(fail('Board 99 not found.'));
+
+      store.updateBoard({ id: 99, name: 'Ghost' });
+      await settle();
+
+      expect(fakeClient.updateBoard).toHaveBeenCalledWith({ id: 99, name: 'Ghost' });
+      expect(store.entities().length).toBe(2);
+      expect(store.error()).toBe('Board 99 not found.');
+    });
+
+    it('should keep the store usable after a failed update', async () => {
+      const store = await loadedStore();
+      fakeClient.updateBoard.and.returnValues(fail('boom'), ok(board(1, 'Second try')));
+
+      store.updateBoard({ id: 1, name: 'First try' });
+      await settle();
+      store.updateBoard({ id: 1, name: 'Second try' });
+      await settle();
+
+      expect(store.entityMap()[1].name).toBe('Second try');
+      expect(store.error()).toBeNull();
+    });
+  });
+
+  describe('deleteBoard', () => {
+    const loadedStore = async () => {
+      fakeClient.listBoards.and.returnValue(
+        ok({ boards: [board(1, 'Alpha'), board(2, 'Beta'), board(3, 'Gamma')] })
+      );
+      const store = TestBed.inject(BoardsStore);
+      store.loadBoards();
+      await settle();
+      return store;
+    };
+
+    it('should remove the board immediately, before the server answers', async () => {
+      const store = await loadedStore();
+      fakeClient.deleteBoard.and.returnValue({ response: new Promise(() => {}) });
+
+      store.deleteBoard({ id: 2 });
+
+      expect(store.entities().map((b) => b.id)).toEqual([1, 3]);
+      expect(store.loading()).toBeFalse();
+    });
+
+    it('should keep the board removed once the server confirms', async () => {
+      const store = await loadedStore();
+      fakeClient.deleteBoard.and.returnValue(ok({}));
+
+      store.deleteBoard({ id: 2 });
+      await settle();
+
+      expect(fakeClient.deleteBoard).toHaveBeenCalledWith({ id: 2 });
+      expect(store.entities().map((b) => b.id)).toEqual([1, 3]);
+      expect(store.error()).toBeNull();
+    });
+
+    it('should put the board back at its original position and set the error on failure', async () => {
+      const store = await loadedStore();
+      fakeClient.deleteBoard.and.returnValue(fail('Board 2 not found.'));
+
+      store.deleteBoard({ id: 2 });
+      expect(store.entities().map((b) => b.id)).toEqual([1, 3]);
+      await settle();
+
+      // Middle position, not appended at the end - the user's list must look unchanged.
+      expect(store.entities().map((b) => b.id)).toEqual([1, 2, 3]);
+      expect(store.entityMap()[2]).toEqual(board(2, 'Beta'));
+      expect(store.error()).toBe('Board 2 not found.');
+    });
+
+    it('should restore the first and the last board to their own positions too', async () => {
+      const store = await loadedStore();
+      fakeClient.deleteBoard.and.returnValues(fail('x'), fail('y'));
+
+      store.deleteBoard({ id: 1 });
+      await settle();
+      store.deleteBoard({ id: 3 });
+      await settle();
+
+      expect(store.entities().map((b) => b.id)).toEqual([1, 2, 3]);
+    });
+
+    it('should still call the server and surface the error for a board it does not know', async () => {
+      const store = await loadedStore();
+      fakeClient.deleteBoard.and.returnValue(fail('Board 99 not found.'));
+
+      store.deleteBoard({ id: 99 });
+      await settle();
+
+      expect(fakeClient.deleteBoard).toHaveBeenCalledWith({ id: 99 });
+      expect(store.entities().length).toBe(3);
+      expect(store.error()).toBe('Board 99 not found.');
+    });
   });
 });
