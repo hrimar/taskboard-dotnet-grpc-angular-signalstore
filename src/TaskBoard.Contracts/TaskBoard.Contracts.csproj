@@ -7,8 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Compiled once, here. Every other project gets the generated types via ProjectReference. -->
-    <Protobuf Include="Protos\*.proto" GrpcServices="Server" ProtoRoot="Protos\" />
+    <!-- Compiled once, here. Every other project gets the generated types via ProjectReference.
+         "Both" (not "Server") so the integration tests can reuse the generated C# clients instead
+         of compiling the protos a second time, which would duplicate the message types. -->
+    <Protobuf Include="Protos\*.proto" GrpcServices="Both" ProtoRoot="Protos\" />
   </ItemGroup>
 
   <ItemGroup>

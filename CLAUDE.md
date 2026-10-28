@@ -31,13 +31,13 @@ npm test                  # Karma/Jasmine
 npx ng test --watch=false --browsers=ChromeHeadless --include src/app/boards/**/*.spec.ts   # single spec / folder
 ```
 
-CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. There are no backend test projects yet, so the backend job is currently a build check; xUnit and Playwright tests are planned.
+CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. The backend job also runs `dotnet test` (xUnit project `tests/TaskBoard.Api.Tests`: mapping unit tests + gRPC integration tests over `WebApplicationFactory<Program>` with an in-memory SQLite database per test); Playwright tests are planned.
 
 ## Architecture
 
 **Contract-first.** `src/TaskBoard.Contracts/Protos/*.proto` (package `taskboard.v1`, C# namespace `TaskBoard.Contracts.V1`) is the single source of truth for both sides:
-- C#: compiled once in `TaskBoard.Contracts.csproj` (`GrpcServices="Server"`); other projects get the types via ProjectReference.
-- TypeScript: `client/taskboard-web/tools/generate-proto.mjs` runs protoc + `@protobuf-ts/plugin` into `src/app/core/proto-gen/` (gitignored, regenerated on every start/build). **A new `.proto` file must be added to the `protoFiles` list in that script.** `greet.proto` is template scaffolding, intentionally excluded.
+- C#: compiled once in `TaskBoard.Contracts.csproj` (`GrpcServices="Both"` – the C# clients are used by the integration tests); other projects get the types via ProjectReference.
+- TypeScript: `client/taskboard-web/tools/generate-proto.mjs` runs protoc + `@protobuf-ts/plugin` into `src/app/core/proto-gen/` (gitignored, regenerated on every start/build). **A new `.proto` file must be added to the `protoFiles` list in that script.**
 - Never hand-edit `proto-gen/` or `Persistence/Migrations/`. Keep proto changes backward-compatible (don't renumber or reuse field numbers; enums start with a `*_UNSPECIFIED = 0`).
 
 **Server layers** (`src/`): `Api` → `Application` → `Domain`, plus `Infrastructure` (EF Core). Domain has no dependencies.

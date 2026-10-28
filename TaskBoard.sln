@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskBoard.Application", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskBoard.Infrastructure", "src\TaskBoard.Infrastructure\TaskBoard.Infrastructure.csproj", "{C94B9AD0-23E2-4948-AB42-7BC56EFDA332}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{44C6CE85-5F6D-4C78-8A27-937CC8DC2EA5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskBoard.Api.Tests", "tests\TaskBoard.Api.Tests\TaskBoard.Api.Tests.csproj", "{9A668EAD-3F84-41BC-B26F-CF9EE1C7C545}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,11 +43,18 @@ Global
 		{C94B9AD0-23E2-4948-AB42-7BC56EFDA332}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C94B9AD0-23E2-4948-AB42-7BC56EFDA332}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C94B9AD0-23E2-4948-AB42-7BC56EFDA332}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A668EAD-3F84-41BC-B26F-CF9EE1C7C545}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A668EAD-3F84-41BC-B26F-CF9EE1C7C545}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A668EAD-3F84-41BC-B26F-CF9EE1C7C545}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A668EAD-3F84-41BC-B26F-CF9EE1C7C545}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {391A44C7-0745-4D9F-A068-4863C17E91A4}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9A668EAD-3F84-41BC-B26F-CF9EE1C7C545} = {44C6CE85-5F6D-4C78-8A27-937CC8DC2EA5}
 	EndGlobalSection
 EndGlobal

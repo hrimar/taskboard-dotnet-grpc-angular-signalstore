@@ -30,8 +30,7 @@ const pluginBin = path.join(
 const protosDir = path.resolve(clientRoot, '..', '..', 'src', 'TaskBoard.Contracts', 'Protos');
 const outDir = path.join(clientRoot, 'src', 'app', 'core', 'proto-gen');
 
-// Add new .proto files here as they're introduced (greet.proto is Api-only test scaffolding
-// and deliberately left out - the Angular app never calls it).
+// Add new .proto files here as they're introduced.
 const protoFiles = ['board.proto', 'label.proto', 'taskitem.proto'].map((f) =>
   path.join(protosDir, f)
 );
