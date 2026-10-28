@@ -48,6 +48,26 @@ public class BoardGrpcServiceTests : GrpcTestBase
         Assert.Equal("keep", (await _client.GetBoardAsync(new GetBoardRequest { Id = created.Id })).Description);
     }
 
+    // Pins a known gap: the service has no input validation yet, so an empty name is persisted.
+    // Validation (InvalidArgument) is planned with the interceptors work; these tests must then flip.
+    [Fact]
+    public async Task CreateBoard_EmptyName_IsCurrentlyAccepted()
+    {
+        var created = await _client.CreateBoardAsync(new CreateBoardRequest { Name = "" });
+
+        Assert.Equal(string.Empty, (await _client.GetBoardAsync(new GetBoardRequest { Id = created.Id })).Name);
+    }
+
+    [Fact]
+    public async Task UpdateBoard_EmptyName_IsCurrentlyAccepted()
+    {
+        var created = await _client.CreateBoardAsync(new CreateBoardRequest { Name = "x" });
+
+        var updated = await _client.UpdateBoardAsync(new UpdateBoardRequest { Id = created.Id, Name = "" });
+
+        Assert.Equal(string.Empty, updated.Name);
+    }
+
     [Fact]
     public async Task DeleteBoard_ExistingBoard_RemovesItAndSubsequentGetIsNotFound()
     {

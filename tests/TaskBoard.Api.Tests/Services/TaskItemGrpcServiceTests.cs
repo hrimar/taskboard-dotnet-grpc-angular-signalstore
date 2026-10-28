@@ -69,6 +69,34 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
         await AssertRpcError(() => _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = 999, Title = "T" }).ResponseAsync, StatusCode.NotFound);
     }
 
+    // The next two tests pin a known gap on purpose: label ids are resolved with a plain
+    // Where(...Contains), so a stale id is dropped instead of rejected. If the service starts
+    // answering NotFound/InvalidArgument (planned with the validation work), these must change.
+    [Fact]
+    public async Task CreateTaskItem_UnknownLabelId_IsSilentlyDropped()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest
+        {
+            BoardId = await NewBoardId(), Title = "T", LabelIds = { 999 }
+        });
+
+        Assert.Empty(created.LabelIds);
+    }
+
+    [Fact]
+    public async Task UpdateTaskItem_UnknownLabelIdInMask_IsSilentlyDropped()
+    {
+        var known = await NewLabelId();
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest
+        {
+            BoardId = await NewBoardId(), Title = "T", LabelIds = { known }
+        });
+
+        var updated = await _tasks.UpdateTaskItemAsync(Update(created.Id, new TaskItem { LabelIds = { 999 } }, "label_ids"));
+
+        Assert.Empty(updated.LabelIds);
+    }
+
     [Fact]
     public async Task GetTaskItem_UnknownId_ReturnsNotFound()
     {
@@ -218,6 +246,37 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
 
         Assert.Equal(3, pages);
         Assert.Equal(new[] { "t1", "t2", "t3", "t4", "t5" }, titles);
+    }
+
+    // Pins the current lenient handling of malformed tokens (see the page_token comment in the
+    // service): a non-numeric token restarts at the first page. A client that echoes a bad
+    // token therefore loops over page one - the reason this should become InvalidArgument.
+    [Fact]
+    public async Task ListTaskItems_NonNumericPageToken_RestartsAtFirstPage()
+    {
+        var boardId = await NewBoardId();
+        for (var i = 1; i <= 3; i++)
+            await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = $"t{i}" });
+
+        var page = await _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = 2, PageToken = "abc" });
+
+        Assert.Equal(new[] { "t1", "t2" }, page.TaskItems.Select(t => t.Title));
+        Assert.Equal("2", page.NextPageToken);
+    }
+
+    // SQLite treats a negative OFFSET as 0, so no error surfaces - but the next token is then
+    // computed from the negative offset ("-1" + 2 = "1"), which silently shifts the paging window.
+    [Fact]
+    public async Task ListTaskItems_NegativePageToken_ReturnsFirstPageWithShiftedNextToken()
+    {
+        var boardId = await NewBoardId();
+        for (var i = 1; i <= 3; i++)
+            await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = $"t{i}" });
+
+        var page = await _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = 2, PageToken = "-1" });
+
+        Assert.Equal(new[] { "t1", "t2" }, page.TaskItems.Select(t => t.Title));
+        Assert.Equal("1", page.NextPageToken);
     }
 
     [Fact]

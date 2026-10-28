@@ -43,6 +43,15 @@ public class LabelGrpcServiceTests : GrpcTestBase
         Assert.Equal("#111111", (await _client.GetLabelAsync(new GetLabelRequest { Id = created.Id })).Color);
     }
 
+    // Pins a known gap, same as for boards: no validation yet, so an empty name is persisted.
+    [Fact]
+    public async Task CreateLabel_EmptyName_IsCurrentlyAccepted()
+    {
+        var created = await _client.CreateLabelAsync(new CreateLabelRequest { Name = "", Color = "#000000" });
+
+        Assert.Equal(string.Empty, (await _client.GetLabelAsync(new GetLabelRequest { Id = created.Id })).Name);
+    }
+
     [Fact]
     public async Task DeleteLabel_ExistingLabel_RemovesIt()
     {
