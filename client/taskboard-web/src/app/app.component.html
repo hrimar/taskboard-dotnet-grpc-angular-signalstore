@@ -1,25 +1,7 @@
-<!--
-  TEMPORARY: raw BoardsStore debug view. Will be replaced by a real Boards feature.component (with Material UI)
-  Proves the store's signals (entities(), loading(), error()) update the template reactively.
--->
-<main style="padding: 1.5rem; font-family: sans-serif">
-  <h1>{{ title }}</h1>
+<mat-toolbar color="primary">
+  <a class="brand" routerLink="/boards">TaskBoard</a>
+</mat-toolbar>
 
-  @if (boardsStore.loading()) {
-    <p>Loading boards…</p>
-  }
-
-  @if (boardsStore.error()) {
-    <p style="color: crimson">Error: {{ boardsStore.error() }}</p>
-  }
-
-  <ul>
-    @for (board of boardsStore.entities(); track board.id) {
-      <li>#{{ board.id }} — {{ board.name }}</li>
-    } @empty {
-      <li>No boards yet.</li>
-    }
-  </ul>
+<main class="page">
+  <router-outlet />
 </main>
-
-<router-outlet />

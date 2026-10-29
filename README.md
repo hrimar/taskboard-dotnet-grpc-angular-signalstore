@@ -51,14 +51,16 @@ TaskBoard.sln
 _Filled in as the project takes shape._
 
 ```bash
-# API
-dotnet run --project src/TaskBoard.Api
+# API (http://localhost:5063)
+dotnet run --project src/TaskBoard.Api --launch-profile http
 
-# Client
+# Client (http://localhost:4200)
 cd client/taskboard-web
 npm install
-ng serve
+npm start      # generates the gRPC clients from the .proto files first, then ng serve
 ```
+
+Tests and build commands for both sides: `dotnet test TaskBoard.sln` for the API, and see [client/taskboard-web/README.md](client/taskboard-web/README.md) for the client.
 
 ## Roadmap
 - [ ] 0. Repository setup (.gitignore, README)

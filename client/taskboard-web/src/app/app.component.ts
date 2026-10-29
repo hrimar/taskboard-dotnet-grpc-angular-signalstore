@@ -1,30 +1,16 @@
-import { Component, inject, OnInit } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-// import { BOARD_CLIENT } from './core/grpc/grpc-clients.provider';
-import { BoardsStore } from './boards/data-access/boards.store';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { RouterLink, RouterOutlet } from '@angular/router';
+import { MatToolbarModule } from '@angular/material/toolbar';
 
+// Pure shell: toolbar + routed page. Data loading belongs to the routed pages (each calls its
+// own store), so nothing here touches a store - otherwise every page would trigger a duplicate
+// request on startup.
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink, RouterOutlet, MatToolbarModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
-export class AppComponent implements OnInit {
-  title = 'taskboard-web';
-
-  // // TEMPORARY: proves the Angular -> gRPC-Web -> API wire-up end to end
-  // // (CORS, Kestrel protocols, transport baseUrl) before the SignalStore step
-  // // replaces this with real state management.
-  // private readonly boardClient = inject(BOARD_CLIENT);
-  // TEMPORARY: proves BoardsStore's signals update the template end to end -
-  // a real Boards feature component (with Material UI) replaces this in the next step.
-  protected readonly boardsStore = inject(BoardsStore);
-
-  ngOnInit(): void {
-    // this.boardClient.listBoards({}).response
-    //   .then((res) => console.log('[gRPC-Web smoke test] ListBoards succeeded:', res.boards))
-    //   .catch((err) => console.error('[gRPC-Web smoke test] ListBoards failed:', err));
-    this.boardsStore.loadBoards();
-  }
-}
+export class AppComponent {}

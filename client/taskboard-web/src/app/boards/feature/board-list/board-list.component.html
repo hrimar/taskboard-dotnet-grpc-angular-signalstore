@@ -1,0 +1,39 @@
+<header class="header">
+  <h1>Boards</h1>
+  <button mat-flat-button type="button" (click)="createBoard()">New board</button>
+</header>
+
+<!-- Shown above the grid, not instead of it: a failed edit/delete rolls back optimistically, so the
+     boards are still valid and should stay visible next to the message. -->
+@if (store.error()) {
+  <div class="state error" role="alert">
+    <p>{{ store.error() }}</p>
+    <button mat-flat-button type="button" (click)="store.loadBoards()">Retry</button>
+  </div>
+}
+
+@if (store.loading() && store.entities().length === 0) {
+  <mat-progress-bar class="loading" mode="indeterminate" aria-label="Loading boards" />
+} @else if (store.entities().length > 0) {
+  <div class="grid">
+    @for (board of store.entities(); track board.id) {
+      <mat-card appearance="outlined">
+        <!-- The link covers only the text area: buttons nested in an anchor are invalid HTML. -->
+        <a class="card-link" [routerLink]="['/boards', board.id]">
+          <mat-card-header>
+            <mat-card-title>{{ board.name }}</mat-card-title>
+          </mat-card-header>
+          @if (board.description) {
+            <mat-card-content>{{ board.description }}</mat-card-content>
+          }
+        </a>
+        <mat-card-actions align="end">
+          <button mat-button type="button" [attr.aria-label]="'Edit board ' + board.name" (click)="editBoard(board)">Edit</button>
+          <button mat-button type="button" [attr.aria-label]="'Delete board ' + board.name" (click)="deleteBoard(board)">Delete</button>
+        </mat-card-actions>
+      </mat-card>
+    }
+  </div>
+} @else if (!store.error()) {
+  <p class="state empty">No boards yet</p>
+}

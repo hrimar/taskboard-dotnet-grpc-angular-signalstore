@@ -1,20 +1,13 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { AppComponent } from './app.component';
-import { BOARD_CLIENT } from './core/grpc/grpc-clients.provider';
 
 describe('AppComponent', () => {
-  let fakeBoardClient: { listBoards: jasmine.Spy };
-
   beforeEach(async () => {
-    // AppComponent triggers BoardsStore.loadBoards() on init, so the real gRPC-Web client
-    // is replaced with a fake - unit tests must never depend on a running API.
-    fakeBoardClient = {
-      listBoards: jasmine.createSpy('listBoards').and.returnValue({ response: Promise.resolve({ boards: [] }) })
-    };
-
+    // The shell no longer talks to the API, so no BOARD_CLIENT fake is needed here.
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [{ provide: BOARD_CLIENT, useValue: fakeBoardClient }]
+      providers: [provideRouter([])]
     }).compileComponents();
   });
 
@@ -23,20 +16,19 @@ describe('AppComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should render the title', () => {
+  it('should show a toolbar brand that links to the boards list', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('taskboard-web');
+
+    const brand = (fixture.nativeElement as HTMLElement).querySelector('mat-toolbar a.brand');
+    expect(brand?.textContent).toContain('TaskBoard');
+    expect(brand?.getAttribute('href')).toBe('/boards');
   });
 
-  it('should load boards on init and show the empty state', async () => {
+  it('should host the routed page in a router outlet', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
 
-    expect(fakeBoardClient.listBoards).toHaveBeenCalledTimes(1);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No boards yet.');
+    expect((fixture.nativeElement as HTMLElement).querySelector('main router-outlet')).not.toBeNull();
   });
 });
