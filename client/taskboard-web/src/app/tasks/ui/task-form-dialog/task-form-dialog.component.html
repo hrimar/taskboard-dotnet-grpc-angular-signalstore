@@ -1,0 +1,83 @@
+<h2 mat-dialog-title>{{ data.task ? 'Edit task' : 'New task' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="save()">
+  <mat-dialog-content>
+    <mat-form-field appearance="outline">
+      <mat-label>Title</mat-label>
+      <input matInput formControlName="title" required cdkFocusInitial />
+      @if (form.controls.title.hasError('required')) {
+        <mat-error>Title is required</mat-error>
+      } @else if (form.controls.title.hasError('maxlength')) {
+        <mat-error>Title must be at most {{ titleMax }} characters</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="3"></textarea>
+      @if (form.controls.description.hasError('maxlength')) {
+        <mat-error>Description must be at most {{ descriptionMax }} characters</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="row">
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status">
+          @for (status of statuses; track status.value) {
+            <mat-option [value]="status.value">{{ status.text }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Priority</mat-label>
+        <mat-select formControlName="priority">
+          @for (priority of priorities; track priority.value) {
+            <mat-option [value]="priority.value">{{ priority.text }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Due date</mat-label>
+      <input matInput [matDatepicker]="picker" formControlName="dueDate" />
+      @if (form.controls.dueDate.value) {
+        <button matSuffix mat-button type="button" aria-label="Clear due date" (click)="clearDueDate()">Clear</button>
+      }
+      <mat-datepicker-toggle matIconSuffix [for]="picker" />
+      <mat-datepicker #picker />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Labels</mat-label>
+      <mat-select formControlName="labelIds" multiple>
+        @for (label of data.labels(); track label.id) {
+          <mat-option [value]="label.id">
+            <span class="swatch" [style.background-color]="label.color"></span>{{ label.name }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div class="new-label">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>New label</mat-label>
+        <input matInput [formControl]="newLabelName" (keydown.enter)="$event.preventDefault(); addLabel()" />
+        @if (newLabelName.hasError('maxlength')) {
+          <mat-error>At most {{ labelNameMax }} characters</mat-error>
+        }
+      </mat-form-field>
+      <input class="color" type="color" aria-label="Label color" [formControl]="newLabelColor" />
+      <button mat-stroked-button type="button" [disabled]="newLabelName.invalid || addingLabel()" (click)="addLabel()">
+        Add
+      </button>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-flat-button type="submit" [disabled]="form.invalid">Save</button>
+  </mat-dialog-actions>
+</form>
