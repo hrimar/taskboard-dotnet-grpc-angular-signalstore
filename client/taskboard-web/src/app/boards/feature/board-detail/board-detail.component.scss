@@ -1,0 +1,21 @@
+:host {
+  display: block;
+  padding: 16px;
+}
+
+.description {
+  white-space: pre-line;
+}
+
+.tasks-placeholder {
+  margin-top: 24px;
+  padding: 48px 16px;
+  border: 2px dashed rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.state {
+  text-align: center;
+  margin-top: 48px;
+}

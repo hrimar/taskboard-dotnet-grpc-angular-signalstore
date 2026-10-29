@@ -15,7 +15,13 @@ describe('app routes', () => {
   beforeEach(async () => {
     // BoardListComponent now injects the real store (which needs BOARD_CLIENT); this spec only
     // tests routing, so a no-op stub keeps it away from the network.
-    const boardsStoreStub = { entities: signal([]), loading: signal(false), error: signal(null), loadBoards: () => undefined };
+    const boardsStoreStub = {
+      entities: signal([]),
+      entityMap: signal({}),
+      loading: signal(false),
+      error: signal(null),
+      loadBoards: () => undefined
+    };
     TestBed.configureTestingModule({
       providers: [provideRouter(routes), { provide: BoardsStore, useValue: boardsStoreStub }]
     });

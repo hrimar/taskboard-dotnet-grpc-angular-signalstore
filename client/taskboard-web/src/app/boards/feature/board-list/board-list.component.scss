@@ -3,6 +3,12 @@
   padding: 16px;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 // auto-fill + minmax gives a responsive grid without media queries.
 .grid {
   display: grid;
@@ -10,22 +16,27 @@
   gap: 16px;
 }
 
-.card-link {
-  color: inherit;
-  text-decoration: none;
+mat-card {
+  transition: box-shadow 0.15s;
 
-  mat-card {
-    height: 100%;
-    transition: box-shadow 0.15s;
-  }
-
-  &:hover mat-card,
-  &:focus-visible mat-card {
+  &:hover,
+  &:focus-within {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
+}
+
+.card-link {
+  display: block;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
 }
 
 .state {
   text-align: center;
   margin-top: 48px;
+}
+
+.state.error {
+  margin-top: 16px;
 }

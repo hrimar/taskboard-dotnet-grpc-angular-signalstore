@@ -1,0 +1,24 @@
+@if (board(); as board) {
+  <a mat-button routerLink="/boards">Back to boards</a>
+  <h1>{{ board.name }}</h1>
+  @if (board.description) {
+    <p class="description">{{ board.description }}</p>
+  }
+
+  <!-- Placeholder for the future Kanban; no task code yet. -->
+  <section class="tasks-placeholder" aria-label="Tasks">
+    <p>Tasks will appear here</p>
+  </section>
+} @else if (store.loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading board" />
+} @else if (store.error()) {
+  <div class="state" role="alert">
+    <p>{{ store.error() }}</p>
+    <a mat-button routerLink="/boards">Back to boards</a>
+  </div>
+} @else {
+  <div class="state">
+    <h1>Board not found</h1>
+    <a mat-button routerLink="/boards">Back to boards</a>
+  </div>
+}
