@@ -7,6 +7,8 @@ import { routes } from './app.routes';
 import { BoardsStore } from './boards/data-access/boards.store';
 import { BoardDetailComponent } from './boards/feature/board-detail/board-detail.component';
 import { BoardListComponent } from './boards/feature/board-list/board-list.component';
+import { LabelsStore } from './labels/data-access/labels.store';
+import { TasksStore } from './tasks/data-access/tasks.store';
 
 describe('app routes', () => {
   let harness: RouterTestingHarness;
@@ -22,8 +24,26 @@ describe('app routes', () => {
       error: signal(null),
       loadBoards: () => undefined
     };
+    // The detail page also drives the task board; stub both of its stores for the same reason.
+    const tasksStoreStub = {
+      entities: signal([]),
+      filter: signal({ priority: null, labelId: null, text: '' }),
+      todo: signal([]),
+      inProgress: signal([]),
+      done: signal([]),
+      hasActiveFilter: signal(false),
+      loading: signal(false),
+      error: signal(null),
+      loadTasks: () => undefined
+    };
+    const labelsStoreStub = { entities: signal([]), error: signal(null), loadLabels: () => undefined };
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes), { provide: BoardsStore, useValue: boardsStoreStub }]
+      providers: [
+        provideRouter(routes),
+        { provide: BoardsStore, useValue: boardsStoreStub },
+        { provide: TasksStore, useValue: tasksStoreStub },
+        { provide: LabelsStore, useValue: labelsStoreStub }
+      ]
     });
     harness = await RouterTestingHarness.create();
     location = TestBed.inject(Location);

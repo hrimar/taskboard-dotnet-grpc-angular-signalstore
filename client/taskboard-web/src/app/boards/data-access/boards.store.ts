@@ -4,8 +4,8 @@ import { setAllEntities, setEntity, updateEntity, removeEntity, withEntities, ad
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { tapResponse } from '@ngrx/operators';
 import { concatMap, exhaustMap, from, pipe, switchMap, tap } from 'rxjs';
-import { RpcError } from '@protobuf-ts/runtime-rpc';
 import { BOARD_CLIENT } from '../../core/grpc/grpc-clients.provider';
+import { toErrorMessage } from '../../core/grpc/rpc-error';
 import type { Board, CreateBoardRequest, DeleteBoardRequest, UpdateBoardRequest } from '../../core/proto-gen/board';
 
 interface BoardsStatus {
@@ -14,13 +14,6 @@ interface BoardsStatus {
 }
 
 const initialStatus: BoardsStatus = { loading: false, error: null };
-
-// RpcError (thrown by every @protobuf-ts client call that fails) carries the gRPC
-// status message our *GrpcService NotFound/InvalidArgument RpcExceptions set server-side -
-// falling back to a generic message for anything else (network failure, CORS, ...).
-function toErrorMessage(error: unknown): string {
-  return error instanceof RpcError ? error.message : 'Unexpected error calling the API.';
-}
 
 // Only the fields the caller actually set. UpdateBoardRequest uses proto3 `optional`, where an
 // unset field means "leave unchanged" - copying `undefined` over the entity would blank it.

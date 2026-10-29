@@ -1,0 +1,98 @@
+:host {
+  display: block;
+  margin-top: 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  mat-form-field {
+    width: 160px;
+  }
+
+  .search {
+    width: 240px;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 4px 16px;
+  border-radius: 4px;
+  color: #b71c1c;
+  background: #ffebee;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.column {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 1.1rem;
+  }
+
+  .count {
+    margin-left: 4px;
+    font-size: 0.85rem;
+    font-weight: normal;
+    opacity: 0.7;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 80px;
+}
+
+.empty {
+  margin: 0;
+  padding: 16px 8px;
+  text-align: center;
+  opacity: 0.6;
+}
+
+app-task-card {
+  cursor: grab;
+}
+
+// Standard cdk drag-drop visuals: the floating preview, the gap left behind and the settle animation.
+.cdk-drag-preview {
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}
+
+.cdk-drag-animating {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+@media (max-width: 800px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}

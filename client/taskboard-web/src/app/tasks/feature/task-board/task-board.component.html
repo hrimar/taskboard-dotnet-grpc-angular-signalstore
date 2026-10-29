@@ -1,0 +1,85 @@
+<div class="toolbar">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Priority</mat-label>
+    <mat-select [value]="tasks.filter().priority" (selectionChange)="tasks.setFilter({ priority: $event.value })">
+      <mat-option [value]="null">All</mat-option>
+      @for (priority of priorities; track priority.value) {
+        <mat-option [value]="priority.value">{{ priority.text }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Label</mat-label>
+    <mat-select [value]="tasks.filter().labelId" (selectionChange)="tasks.setFilter({ labelId: $event.value })">
+      <mat-option [value]="null">All</mat-option>
+      @for (label of labels.entities(); track label.id) {
+        <mat-option [value]="label.id">{{ label.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search">
+    <mat-label>Search</mat-label>
+    <input matInput [value]="tasks.filter().text" (input)="setText($event)" />
+    @if (tasks.filter().text) {
+      <button matSuffix mat-button type="button" aria-label="Clear search" (click)="tasks.setFilter({ text: '' })">
+        Clear
+      </button>
+    }
+  </mat-form-field>
+
+  <span class="spacer"></span>
+  <button mat-flat-button type="button" (click)="createTask()">New task</button>
+</div>
+
+@if (tasks.error(); as error) {
+  <div class="error" role="alert">
+    <span>{{ error }}</span>
+    <button mat-button type="button" (click)="reload()">Retry</button>
+  </div>
+}
+@if (labels.error(); as error) {
+  <div class="error" role="alert">
+    <span>Labels: {{ error }}</span>
+    <button mat-button type="button" (click)="labels.loadLabels()">Retry</button>
+  </div>
+}
+
+@if (tasks.loading() && tasks.entities().length === 0) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading tasks" />
+}
+
+<!-- cdkDropListGroup lets a card be dropped into any of the three lists without wiring connectedTo. -->
+<div class="columns" cdkDropListGroup>
+  @for (column of columns; track column.status) {
+    <section class="column" [attr.aria-label]="column.title">
+      <h2>{{ column.title }} <span class="count">{{ column.tasks().length }}</span></h2>
+      <div
+        class="list"
+        cdkDropList
+        [cdkDropListData]="column.status"
+        (cdkDropListDropped)="drop($event)"
+      >
+        @for (task of column.tasks(); track task.id) {
+          <app-task-card
+            cdkDrag
+            [cdkDragData]="task"
+            [task]="task"
+            [labelsById]="labelsById()"
+            (edit)="editTask($event)"
+            (remove)="deleteTask($event)"
+          />
+        } @empty {
+          <p class="empty">
+            @if (tasks.hasActiveFilter()) {
+              No tasks match the filter.
+            } @else {
+              No tasks here yet. Drop one in or create a new task.
+            }
+          </p>
+        }
+      </div>
+    </section>
+  }
+</div>
