@@ -1,26 +1,46 @@
 # TaskboardWeb
 
+Angular 18 client for TaskBoard. It talks to the .NET API over gRPC-Web, with clients generated from the `.proto` files in `src/TaskBoard.Contracts/Protos`. State lives in NgRx SignalStore stores.
+
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.2.21.
+
+## Prerequisites
+
+- Node 20
+- `npm install` (once, and after `package.json` changes)
+- The API running for anything that loads data: `dotnet run --project src/TaskBoard.Api --launch-profile http` from the repository root (http://localhost:5063)
 
 ## Development server
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+Run `npm start` and navigate to `http://localhost:4200/`. The application reloads automatically when you change a source file.
+
+Use the npm scripts, not `ng serve` / `ng build` directly: `npm start` and `npm run build` first run `npm run proto:gen`, which generates the TypeScript gRPC clients into `src/app/core/proto-gen/` (gitignored). Without it a fresh checkout does not compile.
+
+## Build
+
+Run `npm run build`. The build artifacts are stored in the `dist/` directory.
+
+## Running unit tests
+
+Run `npm test` to execute the unit tests via [Karma](https://karma-runner.github.io) in watch mode.
+
+For a single headless run, as the CI does:
+
+```bash
+npx ng test --watch=false --browsers=ChromeHeadless
+```
+
+To run only one spec or folder, add `--include`, for example `--include 'src/app/boards/**/*.spec.ts'`.
+
+Run `npm run proto:gen` first if `src/app/core/proto-gen/` does not exist yet (`npm start` / `npm run build` do it for you).
 
 ## Code scaffolding
 
 Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
 
-## Build
-
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
-
-## Running unit tests
-
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
-
 ## Running end-to-end tests
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+End-to-end tests (Playwright) are planned but not set up yet.
 
 ## Further help
 
