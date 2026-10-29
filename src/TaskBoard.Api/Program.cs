@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TaskBoard.Api.Services;
+using TaskBoard.Api.Streaming;
 using TaskBoard.Infrastructure.Persistence;
 
 const string AngularDevClient = "AngularDevClient";
@@ -8,6 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddGrpc();
+
+// Singleton, not scoped: the open WatchBoard streams and the services that publish events
+// live in different requests but must share one subscriber list.
+builder.Services.AddSingleton<IBoardEventBroadcaster, BoardEventBroadcaster>();
 
 builder.Services.AddDbContext<TaskBoardDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("TaskBoard")));

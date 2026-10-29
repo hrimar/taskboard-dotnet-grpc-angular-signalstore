@@ -4,6 +4,7 @@ package taskboard.v1;
 
 import "google/protobuf/empty.proto"; 
 import "google/protobuf/timestamp.proto";
+import "taskitem.proto";
 
 option csharp_namespace = "TaskBoard.Contracts.V1";
 
@@ -30,6 +31,11 @@ service BoardService  {
 
     // Delete
     rpc DeleteBoard(DeleteBoardRequest) returns (google.protobuf.Empty);
+
+    // Server streaming: stays open and pushes an event whenever a task on the board is
+    // created, updated or deleted. It sends changes only - no initial snapshot - so a client
+    // loads the current tasks with ListTaskItems and (re)syncs that way after every reconnect.
+    rpc WatchBoard(WatchBoardRequest) returns (stream BoardEvent);
 }
 
 // The request messages
@@ -52,6 +58,19 @@ message UpdateBoardRequest {
 
 message DeleteBoardRequest {
 	int32 id = 1;
+}
+
+message WatchBoardRequest {
+	int32 board_id = 1;
+}
+
+// One change on a watched board. Exactly one field is set (oneof).
+message BoardEvent {
+	oneof event {
+		TaskItem task_created = 1;
+		TaskItem task_updated = 2;
+		int32 task_deleted_id = 3;
+	}
 }
 
 // The response message

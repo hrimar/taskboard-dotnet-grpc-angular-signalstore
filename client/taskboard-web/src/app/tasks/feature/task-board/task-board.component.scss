@@ -23,6 +23,27 @@
   }
 }
 
+.connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .live {
+    background: #2e7d32;
+  }
+
+  .pending {
+    background: #f9a825;
+  }
+}
+
 .error {
   display: flex;
   align-items: center;

@@ -1,6 +1,7 @@
 using Grpc.Core;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.EntityFrameworkCore;
+using TaskBoard.Api.Streaming;
 using TaskBoard.Application.Mapping;
 using TaskBoard.Contracts.V1;
 using TaskBoard.Infrastructure.Persistence;
@@ -13,11 +14,13 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
     private readonly ILogger<TaskItemGrpcService> _logger;
     private readonly TaskBoardDbContext _dbContext;
+    private readonly IBoardEventBroadcaster _broadcaster;
 
-    public TaskItemGrpcService(ILogger<TaskItemGrpcService> logger, TaskBoardDbContext dbContext)
+    public TaskItemGrpcService(ILogger<TaskItemGrpcService> logger, TaskBoardDbContext dbContext, IBoardEventBroadcaster broadcaster)
     {
         _logger = logger;
         _dbContext = dbContext;
+        _broadcaster = broadcaster;
     }
 
     public override async Task<TaskItem> CreateTaskItem(CreateTaskItemRequest request, ServerCallContext context)
@@ -37,7 +40,12 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
         _dbContext.Tasks.Add(entity);
         await _dbContext.SaveChangesAsync();
-        return entity.ToProto();
+
+        // Published only after SaveChanges succeeded: a watcher must never see a task that
+        // failed to persist.
+        var created = entity.ToProto();
+        _broadcaster.Publish(entity.BoardId, new BoardEvent { TaskCreated = created });
+        return created;
     }
 
     public override async Task<TaskItem> GetTaskItem(GetTaskItemRequest request, ServerCallContext context)
@@ -129,7 +137,10 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
         entity.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
-        return entity.ToProto();
+
+        var updated = entity.ToProto();
+        _broadcaster.Publish(entity.BoardId, new BoardEvent { TaskUpdated = updated });
+        return updated;
     }
 
     public override async Task<Empty> DeleteTaskItem(DeleteTaskItemRequest request, ServerCallContext context)
@@ -140,6 +151,8 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
         _dbContext.Tasks.Remove(entity);
         await _dbContext.SaveChangesAsync();
+
+        _broadcaster.Publish(entity.BoardId, new BoardEvent { TaskDeletedId = entity.Id });
         return new Empty();
     }
 }
