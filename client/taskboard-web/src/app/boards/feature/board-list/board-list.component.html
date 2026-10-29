@@ -1,0 +1,27 @@
+<h1>Boards</h1>
+
+@if (store.loading() && store.entities().length === 0) {
+  <mat-progress-bar class="loading" mode="indeterminate" aria-label="Loading boards" />
+} @else if (store.error()) {
+  <div class="state error" role="alert">
+    <p>{{ store.error() }}</p>
+    <button mat-flat-button type="button" (click)="store.loadBoards()">Retry</button>
+  </div>
+} @else if (store.entities().length === 0) {
+  <p class="state empty">No boards yet</p>
+} @else {
+  <div class="grid">
+    @for (board of store.entities(); track board.id) {
+      <a class="card-link" [routerLink]="['/boards', board.id]">
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>{{ board.name }}</mat-card-title>
+          </mat-card-header>
+          @if (board.description) {
+            <mat-card-content>{{ board.description }}</mat-card-content>
+          }
+        </mat-card>
+      </a>
+    }
+  </div>
+}
