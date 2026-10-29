@@ -30,6 +30,20 @@
   </mat-form-field>
 
   <span class="spacer"></span>
+  <!-- Always rendered so the live region exists before its text changes and screen readers announce the update. -->
+  <span class="connection" role="status" aria-live="polite">
+    @switch (tasks.connection()) {
+      @case ('live') {
+        <span class="dot live" aria-hidden="true"></span>Live
+      }
+      @case ('connecting') {
+        <span class="dot pending" aria-hidden="true"></span>Connecting…
+      }
+      @case ('reconnecting') {
+        <span class="dot pending" aria-hidden="true"></span>Reconnecting…
+      }
+    }
+  </span>
   <button mat-flat-button type="button" (click)="createTask()">New task</button>
 </div>
 

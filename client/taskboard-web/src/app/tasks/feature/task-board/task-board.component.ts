@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, untracked } from '@angular/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -47,6 +47,17 @@ export class TaskBoardComponent {
     { status: TaskItemStatus.IN_PROGRESS, title: 'In progress', tasks: this.tasks.inProgress },
     { status: TaskItemStatus.DONE, title: 'Done', tasks: this.tasks.done }
   ];
+
+  constructor() {
+    // The cleanup is what closes the stream: it runs when boardId changes and when the component is
+    // destroyed. Each open watch holds one HTTP/1.1 connection and browsers allow only ~6 per origin,
+    // so a watch must never outlive the page that shows it.
+    effect((onCleanup) => {
+      const id = this.boardId();
+      untracked(() => this.tasks.watchBoard(id));
+      onCleanup(() => this.tasks.watchBoard(null));
+    });
+  }
 
   protected readonly labelsById = computed(() => {
     const map: Record<number, Label> = {};
