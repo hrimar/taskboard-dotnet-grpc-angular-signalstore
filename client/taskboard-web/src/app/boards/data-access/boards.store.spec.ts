@@ -17,7 +17,14 @@ describe('BoardsStore', () => {
   // The client calls return a protobuf-ts UnaryCall; the store only touches `.response`,
   // so a plain object with a Promise is a faithful stand-in.
   const ok = <T>(value: T) => ({ response: Promise.resolve(value) });
-  const fail = (message: string) => ({ response: Promise.reject(new RpcError(message, 'NOT_FOUND')) });
+  // A getter, so the rejected Promise is created only when the store reads `.response`. Built
+  // eagerly (e.g. several values queued in returnValues) it would sit unhandled until its turn
+  // and print "ERROR: RpcError" into the test output.
+  const fail = (message: string) => ({
+    get response() {
+      return Promise.reject(new RpcError(message, 'NOT_FOUND'));
+    }
+  });
 
   // Lets the client Promise and the rxMethod pipe settle (macrotask runs after all microtasks).
   const settle = () => new Promise<void>((resolve) => setTimeout(resolve));

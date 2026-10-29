@@ -1,0 +1,12 @@
+.brand {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+// A readable line length on wide screens; pages stay full-width on narrow ones.
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
