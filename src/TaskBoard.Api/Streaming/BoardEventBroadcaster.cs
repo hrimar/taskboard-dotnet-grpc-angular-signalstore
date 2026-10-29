@@ -51,6 +51,8 @@ public sealed class BoardEventBroadcaster : IBoardEventBroadcaster
             // client is too slow: silently dropping an event would leave its board wrong with no
             // way to notice, so the stream is ended with an error instead. The client reconnects
             // and reloads the board, which is always correct.
+            // A completed writer stays registered until its handler disposes the subscription (the
+            // handler is the one blocked on a slow write), so later publishes repeat this no-op.
             if (!subscription.Writer.TryWrite(boardEvent))
             {
                 subscription.Writer.TryComplete(new RpcException(
@@ -59,6 +61,9 @@ public sealed class BoardEventBroadcaster : IBoardEventBroadcaster
         }
     }
 
+    // The per-board dictionary is deliberately kept when it becomes empty: pruning it would race
+    // with a concurrent Subscribe (GetOrAdd could hand out the dictionary being removed), and the
+    // cost is one small empty dictionary per board id ever watched.
     private void Remove(int boardId, Guid id)
     {
         if (_subscriptions.TryGetValue(boardId, out var subscribers))

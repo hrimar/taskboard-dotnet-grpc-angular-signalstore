@@ -71,6 +71,7 @@ const PAGE_SIZE = 100;
 
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
+const STABLE_CONNECTION_MS = 10000;
 
 // Thrown when the server ends the stream cleanly: a watch is meant to last, so that is also a reason to reconnect.
 class WatchEndedError extends Error {}
@@ -132,6 +133,37 @@ export const TasksStore = signalStore(
       );
     };
 
+    // Full-list loads (loadTasks and the watch's resync) are started independently and can finish
+    // out of order. A response is applied only if no later-started load was applied before it:
+    // a slow older snapshot would otherwise overwrite the newer state AND the events replayed on top of it.
+    let snapshotsStarted = 0;
+    let lastSnapshotApplied = 0;
+
+    // Optimistic edits in flight win over the server's copy, same rule as applyEvent below: the
+    // snapshot may predate them, and applying it as-is would undo a move or resurrect a deleted card.
+    const snapshot$ = (boardId: number) =>
+      defer(() => {
+        const seq = ++snapshotsStarted;
+        return fetchAllTasks$(boardId).pipe(
+          tap((tasks) => {
+            if (seq < lastSnapshotApplied) return;
+            lastSnapshotApplied = seq;
+            const entityMap = store.entityMap();
+            patchState(
+              store,
+              setAllEntities(
+                tasks
+                  .filter((task) => !pendingDeletes.has(task.id))
+                  .map((task) => {
+                    const local = entityMap[task.id];
+                    return local && pendingMoves.has(task.id) ? { ...task, status: local.status } : task;
+                  })
+              )
+            );
+          })
+        );
+      });
+
     // Clear on a board switch only: reloading the same board keeps its cards visible while refreshing.
     const enterBoard = (boardId: number) => {
       if (store.boardId() !== boardId) patchState(store, setAllEntities<TaskItem>([]));
@@ -164,6 +196,7 @@ export const TasksStore = signalStore(
     // One watch session for a board: connect, resync, apply events, reconnect until stopped or NOT_FOUND.
     const watch$ = (boardId: number) => {
       let failures = 0;
+      let openedAt = 0;
       let firstAttempt = true;
 
       return defer(() => {
@@ -178,18 +211,14 @@ export const TasksStore = signalStore(
         const resync$ = opened$.pipe(
           take(1),
           tap(() => {
-            failures = 0; // a connection that got established resets the backoff
-            patchState(store, { connection: 'live' });
+            openedAt = Date.now();
             enterBoard(boardId);
           }),
-          switchMap(() =>
-            fetchAllTasks$(boardId).pipe(
-              tapResponse({
-                next: (tasks) => patchState(store, setAllEntities(tasks)),
-                error: (error: unknown) => patchState(store, { error: toErrorMessage(error) })
-              })
-            )
-          ),
+          // No tapResponse on purpose: a failed reload must fail this session so retry reconnects and
+          // resyncs again. Swallowing it would leave a stale list under a "Live" chip with nothing to fix it.
+          switchMap(() => snapshot$(boardId)),
+          // "Live" only once the list is in, until then the chip stays on "Connecting…" / "Reconnecting…".
+          tap(() => patchState(store, { connection: 'live' })),
           // Also after a failed reload: events must not stay blocked forever.
           finalize(() => resynced$.next()),
           ignoreElements()
@@ -214,6 +243,10 @@ export const TasksStore = signalStore(
             // Board deleted: reconnecting can never succeed.
             if (error instanceof RpcError && error.code === 'NOT_FOUND') return throwError(() => error);
             patchState(store, { connection: 'reconnecting' });
+            // Backoff resets only after a connection that lasted: one that opens and is cut at once
+            // (e.g. a server that keeps answering RESOURCE_EXHAUSTED) must keep backing off.
+            if (openedAt !== 0 && Date.now() - openedAt >= STABLE_CONNECTION_MS) failures = 0;
+            openedAt = 0;
             const wait = Math.min(RECONNECT_BASE_MS * 2 ** failures, RECONNECT_MAX_MS);
             failures++;
             return timer(wait);
@@ -241,9 +274,9 @@ export const TasksStore = signalStore(
             patchState(store, { loading: true, error: null });
           }),
           switchMap((boardId) =>
-            fetchAllTasks$(boardId).pipe(
+            snapshot$(boardId).pipe(
               tapResponse({
-                next: (tasks) => patchState(store, setAllEntities(tasks), { loading: false }),
+                next: () => patchState(store, { loading: false }),
                 error: (error: unknown) => patchState(store, { loading: false, error: toErrorMessage(error) })
               })
             )
