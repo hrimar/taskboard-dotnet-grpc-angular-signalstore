@@ -2,9 +2,11 @@ using Grpc.Core;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.EntityFrameworkCore;
 using TaskBoard.Api.Streaming;
+using TaskBoard.Api.Validation;
 using TaskBoard.Application.Mapping;
 using TaskBoard.Contracts.V1;
 using TaskBoard.Infrastructure.Persistence;
+using DomainLabel = TaskBoard.Domain.Label;
 
 namespace TaskBoard.Api.Services;
 
@@ -25,21 +27,17 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
     public override async Task<TaskItem> CreateTaskItem(CreateTaskItemRequest request, ServerCallContext context)
     {
-        var boardExists = await _dbContext.Boards.AnyAsync(b => b.Id == request.BoardId);
+        var boardExists = await _dbContext.Boards.AnyAsync(b => b.Id == request.BoardId, context.CancellationToken);
         if (!boardExists)
             throw new RpcException(new Status(StatusCode.NotFound, $"Board {request.BoardId} not found."));
 
         var entity = request.ToDomain();
 
         if (request.LabelIds.Count > 0)
-        {
-            entity.Labels = await _dbContext.Labels
-                .Where(l => request.LabelIds.Contains(l.Id))
-                .ToListAsync();
-        }
+            entity.Labels = await ResolveLabelsAsync(request.LabelIds, context.CancellationToken);
 
         _dbContext.Tasks.Add(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
 
         // Published only after SaveChanges succeeded: a watcher must never see a task that
         // failed to persist.
@@ -52,7 +50,7 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
     {
         var entity = await _dbContext.Tasks
             .Include(t => t.Labels)
-            .FirstOrDefaultAsync(t => t.Id == request.Id);
+            .FirstOrDefaultAsync(t => t.Id == request.Id, context.CancellationToken);
 
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Task {request.Id} not found."));
@@ -73,14 +71,12 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
         // string so it stays an opaque value from the client's point of view. A production
         // API would use a cursor over a stable key instead, so results stay correct if rows
         // are inserted/deleted between pages - out of scope for this learning project.
-        var offset = 0;
-        if (!string.IsNullOrEmpty(request.PageToken) && int.TryParse(request.PageToken, out var parsedOffset))
-            offset = parsedOffset;
+        var offset = RequestValidation.ParsePageToken(request.PageToken);
 
         var pageSize = request.PageSize > 0 ? request.PageSize : DefaultPageSize;
 
         // Fetch one extra row to know whether a next page exists, without a second COUNT query.
-        var page = await query.Skip(offset).Take(pageSize + 1).ToListAsync();
+        var page = await query.Skip(offset).Take(pageSize + 1).ToListAsync(context.CancellationToken);
         var hasNextPage = page.Count > pageSize;
         var items = hasNextPage ? page.Take(pageSize) : page;
 
@@ -99,7 +95,7 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
         var entity = await _dbContext.Tasks
             .Include(t => t.Labels)
-            .FirstOrDefaultAsync(t => t.Id == request.Id);
+            .FirstOrDefaultAsync(t => t.Id == request.Id, context.CancellationToken);
 
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Task {request.Id} not found."));
@@ -126,9 +122,7 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
                     entity.DueDate = request.TaskItem.DueDate?.ToDateTime();
                     break;
                 case "label_ids":
-                    entity.Labels = await _dbContext.Labels
-                        .Where(l => request.TaskItem.LabelIds.Contains(l.Id))
-                        .ToListAsync();
+                    entity.Labels = await ResolveLabelsAsync(request.TaskItem.LabelIds, context.CancellationToken);
                     break;
                 default:
                     throw new RpcException(new Status(StatusCode.InvalidArgument, $"Unknown update_mask path '{path}'."));
@@ -136,7 +130,7 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
         }
 
         entity.UpdatedAt = DateTime.UtcNow;
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
 
         var updated = entity.ToProto();
         _broadcaster.Publish(entity.BoardId, new BoardEvent { TaskUpdated = updated });
@@ -145,14 +139,30 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
     public override async Task<Empty> DeleteTaskItem(DeleteTaskItemRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Tasks.FindAsync(request.Id);
+        var entity = await _dbContext.Tasks.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Task {request.Id} not found."));
 
         _dbContext.Tasks.Remove(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
 
         _broadcaster.Publish(entity.BoardId, new BoardEvent { TaskDeletedId = entity.Id });
         return new Empty();
+    }
+
+    // NotFound, not InvalidArgument, to match the board_id check in CreateTaskItem: both are ids of
+    // other resources inside the request body, and one rule is easier for clients than two.
+    // Rejecting instead of silently dropping matters because a stale id (label deleted in another
+    // tab) would otherwise "succeed" and the client would never learn the label was lost.
+    private async Task<List<DomainLabel>> ResolveLabelsAsync(IEnumerable<int> requestedIds, CancellationToken cancellationToken)
+    {
+        var ids = requestedIds.Distinct().ToList();
+        var labels = await _dbContext.Labels.Where(l => ids.Contains(l.Id)).ToListAsync(cancellationToken);
+
+        var missing = ids.Except(labels.Select(l => l.Id)).ToList();
+        if (missing.Count > 0)
+            throw new RpcException(new Status(StatusCode.NotFound, $"Label(s) {string.Join(", ", missing)} not found."));
+
+        return labels;
     }
 }

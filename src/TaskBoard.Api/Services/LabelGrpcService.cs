@@ -1,6 +1,7 @@
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
+using TaskBoard.Api.Validation;
 using TaskBoard.Application.Mapping;
 using TaskBoard.Contracts.V1;
 using TaskBoard.Infrastructure.Persistence;
@@ -21,15 +22,17 @@ public class LabelGrpcService : LabelService.LabelServiceBase
 
     public override async Task<Label> CreateLabel(CreateLabelRequest request, ServerCallContext context)
     {
+        RequestValidation.RequireName(request.Name);
+
         var entity = request.ToDomain();
         _dbContext.Labels.Add(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
         return entity.ToProto();
     }
 
     public override async Task<Label> GetLabel(GetLabelRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Labels.FindAsync(request.Id);
+        var entity = await _dbContext.Labels.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Label {request.Id} not found."));
 
@@ -39,30 +42,33 @@ public class LabelGrpcService : LabelService.LabelServiceBase
     public override async Task<ListLabelsResponse> ListLabels(ListLabelsRequest request, ServerCallContext context)
     {
         var response = new ListLabelsResponse();
-        var labels = await _dbContext.Labels.AsNoTracking().ToListAsync();
+        var labels = await _dbContext.Labels.AsNoTracking().ToListAsync(context.CancellationToken);
         response.Labels.AddRange(labels.Select(l => l.ToProto()));
         return response;
     }
 
     public override async Task<Label> UpdateLabel(UpdateLabelRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Labels.FindAsync(request.Id);
+        // Unlike UpdateBoard this is a full replace (no optional fields), so the name is always required.
+        RequestValidation.RequireName(request.Name);
+
+        var entity = await _dbContext.Labels.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Label {request.Id} not found."));
 
         request.ApplyTo(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
         return entity.ToProto();
     }
 
     public override async Task<Empty> DeleteLabel(DeleteLabelRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Labels.FindAsync(request.Id);
+        var entity = await _dbContext.Labels.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Label {request.Id} not found."));
 
         _dbContext.Labels.Remove(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
         return new Empty();
     }
 }
