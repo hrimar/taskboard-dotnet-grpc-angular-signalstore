@@ -1,5 +1,6 @@
 using Grpc.Core;
 using Grpc.Net.Client;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TaskBoard.Api.Streaming;
@@ -15,15 +16,17 @@ public class ExceptionInterceptorTests : IDisposable
     private const string SecretDetail = "secret-internal-detail";
 
     private readonly TaskBoardApiFactory _factory = new();
+    private readonly WebApplicationFactory<Program> _failing;
     private readonly GrpcChannel _channel;
 
     public ExceptionInterceptorTests()
     {
-        var failing = _factory.WithWebHostBuilder(builder =>
+        // WithWebHostBuilder returns a separate host, so it is kept to be disposed as well.
+        _failing = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IBoardEventBroadcaster, ThrowingBroadcaster>())));
 
-        _channel = GrpcChannel.ForAddress(failing.Server.BaseAddress, new GrpcChannelOptions { HttpClient = failing.CreateClient() });
+        _channel = GrpcChannel.ForAddress(_failing.Server.BaseAddress, new GrpcChannelOptions { HttpClient = _failing.CreateClient() });
     }
 
     [Fact]
@@ -69,6 +72,7 @@ public class ExceptionInterceptorTests : IDisposable
     public void Dispose()
     {
         _channel.Dispose();
+        _failing.Dispose();
         _factory.Dispose();
     }
 

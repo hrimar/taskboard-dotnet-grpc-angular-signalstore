@@ -15,6 +15,10 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
     private const int DefaultPageSize = 20;
     private const int MaxPageSize = 200;
 
+    // Keep in sync with the switch in UpdateTaskItem.
+    private static readonly HashSet<string> UpdatablePaths =
+        ["title", "description", "status", "priority", "due_date", "label_ids"];
+
     private readonly ILogger<TaskItemGrpcService> _logger;
     private readonly TaskBoardDbContext _dbContext;
     private readonly IBoardEventBroadcaster _broadcaster;
@@ -110,6 +114,10 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
         // Everything that can reject the request runs BEFORE the entity is touched, so a failure
         // never leaves a half-applied change on the tracked entity.
+        var unknownPath = request.UpdateMask.Paths.FirstOrDefault(path => !UpdatablePaths.Contains(path));
+        if (unknownPath is not null)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, $"Unknown update_mask path '{unknownPath}'."));
+
         if (request.UpdateMask.Paths.Contains("title"))
             RequestValidation.RequireTitle(request.TaskItem.Title);
 
@@ -142,7 +150,8 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
                     entity.Labels = labels!; // resolved above because the mask contains this path
                     break;
                 default:
-                    throw new RpcException(new Status(StatusCode.InvalidArgument, $"Unknown update_mask path '{path}'."));
+                    // Unreachable while UpdatablePaths and this switch list the same paths.
+                    throw new InvalidOperationException($"Update mask path '{path}' is allowed but not handled.");
             }
         }
 

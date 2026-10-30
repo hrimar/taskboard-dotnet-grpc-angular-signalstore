@@ -316,6 +316,19 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
     }
 
     [Fact]
+    public async Task UpdateTaskItem_UnknownMaskPath_ReturnsInvalidArgumentAndChangesNothing()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "keep" });
+
+        // The valid path comes first on purpose: it must not be applied when a later path is rejected.
+        var request = Update(created.Id, new TaskItem { Title = "changed" }, "title", "no_such_field");
+
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(request).ResponseAsync, StatusCode.InvalidArgument);
+
+        Assert.Equal("keep", (await _tasks.GetTaskItemAsync(new GetTaskItemRequest { Id = created.Id })).Title);
+    }
+
+    [Fact]
     public async Task UpdateTaskItem_MissingTaskItem_ReturnsInvalidArgument()
     {
         var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "T" });
