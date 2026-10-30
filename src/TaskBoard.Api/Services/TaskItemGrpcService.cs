@@ -13,6 +13,7 @@ namespace TaskBoard.Api.Services;
 public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 {
     private const int DefaultPageSize = 20;
+    private const int MaxPageSize = 200;
 
     private readonly ILogger<TaskItemGrpcService> _logger;
     private readonly TaskBoardDbContext _dbContext;
@@ -27,6 +28,8 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
     public override async Task<TaskItem> CreateTaskItem(CreateTaskItemRequest request, ServerCallContext context)
     {
+        RequestValidation.RequireTitle(request.Title);
+
         var boardExists = await _dbContext.Boards.AnyAsync(b => b.Id == request.BoardId, context.CancellationToken);
         if (!boardExists)
             throw new RpcException(new Status(StatusCode.NotFound, $"Board {request.BoardId} not found."));
@@ -73,7 +76,9 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
         // are inserted/deleted between pages - out of scope for this learning project.
         var offset = RequestValidation.ParsePageToken(request.PageToken);
 
-        var pageSize = request.PageSize > 0 ? request.PageSize : DefaultPageSize;
+        // Capped: the client chooses page_size, so without a ceiling one call could ask for every row
+        // (and pageSize + 1 below would overflow for int.MaxValue).
+        var pageSize = request.PageSize > 0 ? Math.Min(request.PageSize, MaxPageSize) : DefaultPageSize;
 
         // Fetch one extra row to know whether a next page exists, without a second COUNT query.
         var page = await query.Skip(offset).Take(pageSize + 1).ToListAsync(context.CancellationToken);
@@ -93,12 +98,24 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
         if (request.UpdateMask is null || request.UpdateMask.Paths.Count == 0)
             throw new RpcException(new Status(StatusCode.InvalidArgument, "update_mask must list at least one field."));
 
+        if (request.TaskItem is null)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "task_item must carry the new values."));
+
         var entity = await _dbContext.Tasks
             .Include(t => t.Labels)
             .FirstOrDefaultAsync(t => t.Id == request.Id, context.CancellationToken);
 
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Task {request.Id} not found."));
+
+        // Everything that can reject the request runs BEFORE the entity is touched, so a failure
+        // never leaves a half-applied change on the tracked entity.
+        if (request.UpdateMask.Paths.Contains("title"))
+            RequestValidation.RequireTitle(request.TaskItem.Title);
+
+        var labels = request.UpdateMask.Paths.Contains("label_ids")
+            ? await ResolveLabelsAsync(request.TaskItem.LabelIds, context.CancellationToken)
+            : null;
 
         // FieldMask-driven update: only the paths the client listed get applied - everything
         // else in request.TaskItem is ignored, even if it carries a value.
@@ -122,7 +139,7 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
                     entity.DueDate = request.TaskItem.DueDate?.ToDateTime();
                     break;
                 case "label_ids":
-                    entity.Labels = await ResolveLabelsAsync(request.TaskItem.LabelIds, context.CancellationToken);
+                    entity.Labels = labels!; // resolved above because the mask contains this path
                     break;
                 default:
                     throw new RpcException(new Status(StatusCode.InvalidArgument, $"Unknown update_mask path '{path}'."));

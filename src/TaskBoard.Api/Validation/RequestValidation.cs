@@ -14,6 +14,12 @@ internal static class RequestValidation
             throw InvalidArgument("name must not be empty.");
     }
 
+    public static void RequireTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            throw InvalidArgument("title must not be empty.");
+    }
+
     // The token is an opaque string to clients, but this server issues plain row offsets (see
     // ListTaskItems), so anything that is not a non-negative integer was never issued by us.
     // NumberStyles.None also rejects a sign and surrounding whitespace, so "-1" and " 1" fail.

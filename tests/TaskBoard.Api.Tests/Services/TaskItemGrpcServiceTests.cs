@@ -291,4 +291,51 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
         Assert.Equal(2, page.TaskItems.Count);
         Assert.Equal(string.Empty, page.NextPageToken);
     }
+
+    [Fact]
+    public async Task ListTaskItems_HugePageSize_IsCappedInsteadOfFailing()
+    {
+        var boardId = await NewBoardId();
+        for (var i = 0; i < 201; i++)
+            await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = "t" });
+
+        var page = await _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = int.MaxValue });
+
+        Assert.Equal(200, page.TaskItems.Count);
+        Assert.Equal("200", page.NextPageToken);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateTaskItem_BlankTitle_ReturnsInvalidArgument(string title)
+    {
+        var boardId = await NewBoardId();
+
+        await AssertRpcError(() => _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = title }).ResponseAsync, StatusCode.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task UpdateTaskItem_MissingTaskItem_ReturnsInvalidArgument()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "T" });
+        var request = new UpdateTaskItemRequest { Id = created.Id, UpdateMask = new FieldMask { Paths = { "title" } } };
+
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(request).ResponseAsync, StatusCode.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task UpdateTaskItem_BlankTitleInMask_ReturnsInvalidArgumentAndChangesNothing()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "keep" });
+
+        // Two paths on purpose: the valid one must not be applied when the other is rejected.
+        var request = Update(created.Id, new TaskItem { Title = " ", Description = "changed" }, "description", "title");
+
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(request).ResponseAsync, StatusCode.InvalidArgument);
+
+        var stored = await _tasks.GetTaskItemAsync(new GetTaskItemRequest { Id = created.Id });
+        Assert.Equal("keep", stored.Title);
+        Assert.Equal(string.Empty, stored.Description);
+    }
 }

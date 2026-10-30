@@ -31,6 +31,13 @@ public sealed class LoggingInterceptor : Interceptor
             status = ex.StatusCode;
             throw;
         }
+        catch (Exception)
+        {
+            // Only reachable if ExceptionInterceptor is removed or reordered; gRPC reports such an
+            // exception to the client as Unknown, so log that instead of a misleading OK.
+            status = StatusCode.Unknown;
+            throw;
+        }
         finally
         {
             Log(context.Method, status, started);
@@ -53,6 +60,11 @@ public sealed class LoggingInterceptor : Interceptor
         catch (RpcException ex)
         {
             status = ex.StatusCode;
+            throw;
+        }
+        catch (Exception)
+        {
+            status = StatusCode.Unknown; // see UnaryServerHandler
             throw;
         }
         finally

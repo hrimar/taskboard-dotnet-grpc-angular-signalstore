@@ -33,7 +33,8 @@ public class ExceptionInterceptorTests : IDisposable
         var tasks = new TaskItemService.TaskItemServiceClient(_channel);
         var board = await boards.CreateBoardAsync(new CreateBoardRequest { Name = "b" });
 
-        // The task is saved, then Publish throws.
+        // The task is saved, then Publish throws. The real broadcaster cannot fail this way - this
+        // only borrows it as a convenient place to make a handler throw something unexpected.
         var ex = await Assert.ThrowsAsync<RpcException>(async () =>
             await tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = board.Id, Title = "T" }));
 
