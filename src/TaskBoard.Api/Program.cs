@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TaskBoard.Api.Interceptors;
 using TaskBoard.Api.Services;
 using TaskBoard.Api.Streaming;
 using TaskBoard.Infrastructure.Persistence;
@@ -8,7 +9,13 @@ const string AngularDevClient = "AngularDevClient";
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddGrpc();
+// Interceptors run in registration order, first = outermost: Logging wraps Exception, so it logs
+// the status the client actually receives (after unexpected exceptions became Internal).
+builder.Services.AddGrpc(options =>
+{
+    options.Interceptors.Add<LoggingInterceptor>();
+    options.Interceptors.Add<ExceptionInterceptor>();
+});
 
 // Singleton, not scoped: the open WatchBoard streams and the services that publish events
 // live in different requests but must share one subscriber list.

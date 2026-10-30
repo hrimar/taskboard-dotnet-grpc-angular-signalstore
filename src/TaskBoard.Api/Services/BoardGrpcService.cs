@@ -2,6 +2,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
 using TaskBoard.Api.Streaming;
+using TaskBoard.Api.Validation;
 using TaskBoard.Application.Mapping;
 using TaskBoard.Contracts.V1;
 using TaskBoard.Infrastructure.Persistence;
@@ -23,15 +24,17 @@ public class BoardGrpcService : BoardService.BoardServiceBase
 
     public override async Task<Board> CreateBoard(CreateBoardRequest request, ServerCallContext context)
     {
+        RequestValidation.RequireName(request.Name);
+
         var entity = request.ToDomain();
         _dbContext.Boards.Add(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
         return entity.ToProto();
     }
 
     public override async Task<Board> GetBoard(GetBoardRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Boards.FindAsync(request.Id);
+        var entity = await _dbContext.Boards.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Board {request.Id} not found."));
 
@@ -41,30 +44,34 @@ public class BoardGrpcService : BoardService.BoardServiceBase
     public override async Task<ListBoardsResponse> ListBoards(ListBoardsRequest request, ServerCallContext context)
     {
         var response = new ListBoardsResponse();
-        var boards = await _dbContext.Boards.AsNoTracking().ToListAsync();
+        var boards = await _dbContext.Boards.AsNoTracking().ToListAsync(context.CancellationToken);
         response.Boards.AddRange(boards.Select(b => b.ToProto()));
         return response;
     }
 
     public override async Task<Board> UpdateBoard(UpdateBoardRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Boards.FindAsync(request.Id);
+        // Optional field: only a name that is actually sent must be valid.
+        if (request.HasName)
+            RequestValidation.RequireName(request.Name);
+
+        var entity = await _dbContext.Boards.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Board {request.Id} not found."));
 
         request.ApplyTo(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
         return entity.ToProto();
     }
 
     public override async Task<Empty> DeleteBoard(DeleteBoardRequest request, ServerCallContext context)
     {
-        var entity = await _dbContext.Boards.FindAsync(request.Id);
+        var entity = await _dbContext.Boards.FindAsync([request.Id], context.CancellationToken);
         if (entity is null)
             throw new RpcException(new Status(StatusCode.NotFound, $"Board {request.Id} not found."));
 
         _dbContext.Boards.Remove(entity);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(context.CancellationToken);
         return new Empty();
     }
 

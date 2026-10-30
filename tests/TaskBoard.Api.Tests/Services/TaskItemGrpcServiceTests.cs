@@ -69,22 +69,22 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
         await AssertRpcError(() => _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = 999, Title = "T" }).ResponseAsync, StatusCode.NotFound);
     }
 
-    // The next two tests pin a known gap on purpose: label ids are resolved with a plain
-    // Where(...Contains), so a stale id is dropped instead of rejected. If the service starts
-    // answering NotFound/InvalidArgument (planned with the validation work), these must change.
     [Fact]
-    public async Task CreateTaskItem_UnknownLabelId_IsSilentlyDropped()
+    public async Task CreateTaskItem_UnknownLabelId_ReturnsNotFoundNamingOnlyTheMissingId()
     {
-        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest
-        {
-            BoardId = await NewBoardId(), Title = "T", LabelIds = { 999 }
-        });
+        var known = await NewLabelId();
+        var boardId = await NewBoardId();
 
-        Assert.Empty(created.LabelIds);
+        var ex = await AssertRpcError(() => _tasks.CreateTaskItemAsync(new CreateTaskItemRequest
+        {
+            BoardId = boardId, Title = "T", LabelIds = { known, 999 }
+        }).ResponseAsync, StatusCode.NotFound);
+
+        Assert.Equal("Label(s) 999 not found.", ex.Status.Detail);
     }
 
     [Fact]
-    public async Task UpdateTaskItem_UnknownLabelIdInMask_IsSilentlyDropped()
+    public async Task UpdateTaskItem_UnknownLabelIdInMask_ReturnsNotFoundAndKeepsLabels()
     {
         var known = await NewLabelId();
         var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest
@@ -92,9 +92,22 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
             BoardId = await NewBoardId(), Title = "T", LabelIds = { known }
         });
 
-        var updated = await _tasks.UpdateTaskItemAsync(Update(created.Id, new TaskItem { LabelIds = { 999 } }, "label_ids"));
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(Update(created.Id, new TaskItem { LabelIds = { 999 } }, "label_ids")).ResponseAsync, StatusCode.NotFound);
 
-        Assert.Empty(updated.LabelIds);
+        Assert.Equal(new[] { known }, (await _tasks.GetTaskItemAsync(new GetTaskItemRequest { Id = created.Id })).LabelIds);
+    }
+
+    [Fact]
+    public async Task CreateTaskItem_DuplicateLabelIds_AreAcceptedOnce()
+    {
+        var known = await NewLabelId();
+
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest
+        {
+            BoardId = await NewBoardId(), Title = "T", LabelIds = { known, known }
+        });
+
+        Assert.Equal(new[] { known }, created.LabelIds);
     }
 
     [Fact]
@@ -248,35 +261,22 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
         Assert.Equal(new[] { "t1", "t2", "t3", "t4", "t5" }, titles);
     }
 
-    // Pins the current lenient handling of malformed tokens (see the page_token comment in the
-    // service): a non-numeric token restarts at the first page. A client that echoes a bad
-    // token therefore loops over page one - the reason this should become InvalidArgument.
-    [Fact]
-    public async Task ListTaskItems_NonNumericPageToken_RestartsAtFirstPage()
+    // A token this server never issued must fail loudly: silently restarting at page one would make
+    // a client that echoes a bad token loop over the first page forever. "-1" is covered too -
+    // SQLite itself would accept a negative OFFSET and shift the next token instead of failing.
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("-1")]
+    [InlineData("+1")]
+    [InlineData(" 1")]
+    [InlineData("99999999999")]
+    public async Task ListTaskItems_MalformedPageToken_ReturnsInvalidArgument(string token)
     {
         var boardId = await NewBoardId();
-        for (var i = 1; i <= 3; i++)
-            await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = $"t{i}" });
 
-        var page = await _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = 2, PageToken = "abc" });
-
-        Assert.Equal(new[] { "t1", "t2" }, page.TaskItems.Select(t => t.Title));
-        Assert.Equal("2", page.NextPageToken);
-    }
-
-    // SQLite treats a negative OFFSET as 0, so no error surfaces - but the next token is then
-    // computed from the negative offset ("-1" + 2 = "1"), which silently shifts the paging window.
-    [Fact]
-    public async Task ListTaskItems_NegativePageToken_ReturnsFirstPageWithShiftedNextToken()
-    {
-        var boardId = await NewBoardId();
-        for (var i = 1; i <= 3; i++)
-            await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = $"t{i}" });
-
-        var page = await _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = 2, PageToken = "-1" });
-
-        Assert.Equal(new[] { "t1", "t2" }, page.TaskItems.Select(t => t.Title));
-        Assert.Equal("1", page.NextPageToken);
+        await AssertRpcError(
+            () => _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = 2, PageToken = token }).ResponseAsync,
+            StatusCode.InvalidArgument);
     }
 
     [Fact]
@@ -290,5 +290,65 @@ public class TaskItemGrpcServiceTests : GrpcTestBase
 
         Assert.Equal(2, page.TaskItems.Count);
         Assert.Equal(string.Empty, page.NextPageToken);
+    }
+
+    [Fact]
+    public async Task ListTaskItems_HugePageSize_IsCappedInsteadOfFailing()
+    {
+        var boardId = await NewBoardId();
+        for (var i = 0; i < 201; i++)
+            await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = "t" });
+
+        var page = await _tasks.ListTaskItemsAsync(new ListTaskItemsRequest { BoardId = boardId, PageSize = int.MaxValue });
+
+        Assert.Equal(200, page.TaskItems.Count);
+        Assert.Equal("200", page.NextPageToken);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateTaskItem_BlankTitle_ReturnsInvalidArgument(string title)
+    {
+        var boardId = await NewBoardId();
+
+        await AssertRpcError(() => _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = boardId, Title = title }).ResponseAsync, StatusCode.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task UpdateTaskItem_UnknownMaskPath_ReturnsInvalidArgumentAndChangesNothing()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "keep" });
+
+        // The valid path comes first on purpose: it must not be applied when a later path is rejected.
+        var request = Update(created.Id, new TaskItem { Title = "changed" }, "title", "no_such_field");
+
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(request).ResponseAsync, StatusCode.InvalidArgument);
+
+        Assert.Equal("keep", (await _tasks.GetTaskItemAsync(new GetTaskItemRequest { Id = created.Id })).Title);
+    }
+
+    [Fact]
+    public async Task UpdateTaskItem_MissingTaskItem_ReturnsInvalidArgument()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "T" });
+        var request = new UpdateTaskItemRequest { Id = created.Id, UpdateMask = new FieldMask { Paths = { "title" } } };
+
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(request).ResponseAsync, StatusCode.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task UpdateTaskItem_BlankTitleInMask_ReturnsInvalidArgumentAndChangesNothing()
+    {
+        var created = await _tasks.CreateTaskItemAsync(new CreateTaskItemRequest { BoardId = await NewBoardId(), Title = "keep" });
+
+        // Two paths on purpose: the valid one must not be applied when the other is rejected.
+        var request = Update(created.Id, new TaskItem { Title = " ", Description = "changed" }, "description", "title");
+
+        await AssertRpcError(() => _tasks.UpdateTaskItemAsync(request).ResponseAsync, StatusCode.InvalidArgument);
+
+        var stored = await _tasks.GetTaskItemAsync(new GetTaskItemRequest { Id = created.Id });
+        Assert.Equal("keep", stored.Title);
+        Assert.Equal(string.Empty, stored.Description);
     }
 }
