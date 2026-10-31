@@ -26,7 +26,9 @@ export default defineConfig({
       // "/" is the plain MapGet in Program.cs: it answers only once Kestrel listens.
       url: `${apiUrl}/`,
       timeout: 120_000,
-      reuseExistingServer: !isCI
+      // Never reuse: an API already on 5180 would bring its own (old) database, so the
+      // "fresh e2e.db per run" guarantee would silently not hold. A busy port fails loudly instead.
+      reuseExistingServer: false
     },
     {
       // npm start would serve the dev configuration on 4200; proto:gen is what prestart adds.
