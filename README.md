@@ -8,8 +8,11 @@ It is a study project, not production software.
 - **gRPC-Web** so a browser client can talk to a gRPC server
 - **gRPC JSON transcoding**: the same services exposed as REST + Swagger, for a gRPC vs REST comparison
 - EF Core with **SQLite** and migrations
-- Cross-cutting concerns: interceptors, gRPC status codes, validation, deadlines
-- Angular standalone components with **NgRx SignalStore** (`withEntities`, `rxMethod`, optimistic updates)
+- Cross-cutting concerns: interceptors, gRPC status codes, request validation
+- Angular standalone components with **NgRx SignalStore** (`withEntities`, `rxMethod`, optimistic updates with rollback)
+- Kanban board with CDK drag-drop, filters and live updates between browser tabs
+- Tests on three levels (xUnit, Jasmine, Playwright) and CI on every pull request
+- An AI-assisted workflow with Claude Code: `CLAUDE.md`, hooks, subagents, skills, MCP and AI PR review (see [How AI was used](#how-ai-was-used))
 
 ## Tech stack
 | Area | Technology |
@@ -18,7 +21,8 @@ It is a study project, not production software.
 | Data | EF Core + SQLite |
 | Client | Angular 18.2, Angular Material, `@ngrx/signals` 18.x |
 | gRPC client | `@protobuf-ts/grpcweb-transport` |
-| Tooling | Node 20, npm 10, `dotnet-ef`, `grpcurl` / `grpcui` |
+| Tests | xUnit + `WebApplicationFactory`, Jasmine/Karma, Playwright |
+| Tooling | Node 20, npm 10, `dotnet-ef`, GitHub Actions, Claude Code |
 
 ## Architecture
 ```mermaid
@@ -33,25 +37,32 @@ flowchart LR
     PROTO -. codegen .-> UI
 ```
 
-Planned layout (monorepo, client and server are independent projects):
+Layout (monorepo, client and server are independent projects):
 
 ```
 src/
-  TaskBoard.Contracts/      # .proto files
-  TaskBoard.Api/            # gRPC services, interceptors, gRPC-Web, transcoding
-  TaskBoard.Application/    # use cases, mapping, validation
+  TaskBoard.Contracts/      # .proto files (single source of truth)
+  TaskBoard.Api/            # gRPC services, interceptors, validation, streaming, gRPC-Web, transcoding
+  TaskBoard.Application/    # proto <-> domain mapping
   TaskBoard.Domain/         # entities
-  TaskBoard.Infrastructure/ # DbContext, migrations
+  TaskBoard.Infrastructure/ # DbContext, EF configurations, migrations
+tests/
+  TaskBoard.Api.Tests/      # xUnit: mapping unit tests + gRPC/REST integration tests
 client/
-  taskboard-web/            # Angular app
+  taskboard-web/            # Angular app (src/app/<feature>/data-access|feature|ui) + e2e/ (Playwright)
+.claude/                    # Claude Code hooks, subagents and skills
+.github/                    # CI, Claude review workflows, PR template
 TaskBoard.sln
 ```
 
 ## Getting started
-_Filled in as the project takes shape._
+Prerequisites: .NET 8 SDK (pinned in `global.json`), Node 20 + npm 10, and the EF Core CLI (`dotnet tool install --global dotnet-ef`).
 
 ```bash
-# API (http://localhost:5063)
+# Database: creates src/TaskBoard.Api/taskboard.db (SQLite) from the migrations
+dotnet ef database update --project src/TaskBoard.Infrastructure --startup-project src/TaskBoard.Api
+
+# API (http://localhost:5063, Swagger UI at /swagger)
 dotnet run --project src/TaskBoard.Api --launch-profile http
 
 # Client (http://localhost:4200)
@@ -60,7 +71,17 @@ npm install
 npm start      # generates the gRPC clients from the .proto files first, then ng serve
 ```
 
-Tests and build commands for both sides: `dotnet test TaskBoard.sln` for the API, and see [client/taskboard-web/README.md](client/taskboard-web/README.md) for the client.
+Tests:
+
+```bash
+dotnet test TaskBoard.sln                                   # backend: unit + integration
+cd client/taskboard-web
+npx ng test --watch=false --browsers=ChromeHeadless         # client specs
+npx playwright install chromium                             # once per machine
+npm run e2e                                                 # Playwright, own API (:5180) and ng serve (:4300)
+```
+
+More client commands: [client/taskboard-web/README.md](client/taskboard-web/README.md).
 
 ## REST and Swagger (JSON transcoding)
 The same service classes also answer plain REST/JSON, so `curl`, scripts and other HTTP clients can use the API without a gRPC client. Routes come from `google.api.http` options in the `.proto` files; there is no second implementation, so the interceptors, validation and status codes are the same (`NotFound` becomes 404, `InvalidArgument` 400, `Aborted` 409, ...). `WatchBoard` is gRPC-only on purpose - a long-lived stream is not request/response JSON.
@@ -97,17 +118,27 @@ Protobuf is about 2-3x smaller because field names are numbers and values are pa
 | Best for | our Angular app, service-to-service | scripts, `curl`, third parties, Swagger |
 | Streaming | yes (`WatchBoard`) | no |
 
+## How AI was used
+The project was built with **Claude Code** as the only AI tool, starting from plain prompts and growing into a configured workflow:
+- [CLAUDE.md](CLAUDE.md) – project context, commands and rules for every session.
+- [Hooks](.claude/hooks/) – ask before `git commit`/`push`, protect generated code and migrations, regenerate the TypeScript clients after a `.proto` change.
+- [Subagents](.claude/agents/) – `dotnet-backend`, `angular-frontend`, `test-engineer`, read-only `code-reviewer`.
+- [Skills](.claude/skills/) – `pr-draft` (drafts and opens a PR from the branch), `signalstore-feature`, `add-grpc-rpc`, `ef-migration`.
+- [Playwright MCP](.mcp.json) – lets Claude explore the running UI.
+- GitHub: [CI](.github/workflows/ci.yml), an automatic [Claude PR review](.github/workflows/claude-code-review.yml) and [`@claude` on demand](.github/workflows/claude.yml). The [pull requests](https://github.com/hrimar/taskboard-dotnet-grpc-angular-signalstore/pulls?q=is%3Apr) show the reviews and the replies.
+
 ## Roadmap
-- [ ] 0. Repository setup (.gitignore, README)
-- [ ] 1. Solution and Angular skeleton, CORS + gRPC-Web
-- [ ] 2. Proto design (`taskboard.v1`)
-- [ ] 3. Backend CRUD with EF Core + SQLite migrations
-- [ ] 4. Interceptors, error handling, deadlines
-- [ ] 5. Angular foundation and generated gRPC clients
-- [ ] 6. State management with SignalStore
-- [ ] 7. Server streaming (`WatchBoard`)
-- [ ] 8. REST comparison via JSON transcoding
-- [ ] 9. Optional: JWT auth, PostgreSQL/Docker, client and bidirectional streaming, tests
+- [x] 0. Repository setup (.gitignore, README)
+- [x] 1. Solution and Angular skeleton, CORS + gRPC-Web
+- [x] 2. Proto design (`taskboard.v1`)
+- [x] 3. Backend CRUD with EF Core + SQLite migrations
+- [x] 4. Interceptors, error handling, request validation
+- [x] 5. Angular foundation and generated gRPC clients
+- [x] 6. State management with SignalStore (boards UI, Kanban with drag-drop)
+- [x] 7. Server streaming (`WatchBoard`)
+- [x] 8. REST comparison via JSON transcoding + Swagger
+- [x] 9. Tests (xUnit, Jasmine, Playwright) and CI
+- [ ] Ideas: label management page, sorting and due-date filter, client-side deadlines, JWT auth, PostgreSQL/Docker, client and bidirectional streaming
 
 ## License
 MIT – see [LICENSE](LICENSE).

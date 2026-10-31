@@ -1,8 +1,19 @@
-# TaskboardWeb
+# TaskBoard web client
 
 Angular 18 client for TaskBoard. It talks to the .NET API over gRPC-Web, with clients generated from the `.proto` files in `src/TaskBoard.Contracts/Protos`. State lives in NgRx SignalStore stores.
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.2.21.
+## Structure
+
+```
+src/app/
+  core/grpc/        # shared gRPC-Web transport + DI tokens (BOARD_CLIENT, LABEL_CLIENT, TASK_ITEM_CLIENT), RpcError helper
+  core/proto-gen/   # generated clients (gitignored, never edit by hand)
+  boards/           # data-access (BoardsStore), feature (list, detail page), ui (form dialog)
+  tasks/            # data-access (TasksStore, WatchBoard adapter), feature (Kanban board), ui (card, form dialog)
+  labels/           # data-access (LabelsStore)
+  shared/ui/        # reusable confirm dialog
+e2e/                # Playwright specs, shared helpers and the test API start script
+```
 
 ## Prerequisites
 
@@ -34,10 +45,6 @@ To run only one spec or folder, add `--include`, for example `--include 'src/app
 
 Run `npm run proto:gen` first if `src/app/core/proto-gen/` does not exist yet (`npm start` / `npm run build` do it for you).
 
-## Code scaffolding
-
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
-
 ## Running end-to-end tests
 
 Playwright tests live in `e2e/`. Once per machine, install the browser: `npx playwright install chromium`. Then:
@@ -49,7 +56,3 @@ npx playwright show-report   # HTML report of the last run
 ```
 
 The test servers use their own ports and database, so the run never touches the dev API (:5063), `taskboard.db` or `ng serve` (:4200), and works while those are running. Requires the .NET 8 SDK, because the API is started with `dotnet run`.
-
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
