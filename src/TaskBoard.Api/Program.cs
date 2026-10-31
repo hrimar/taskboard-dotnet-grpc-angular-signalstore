@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using TaskBoard.Api.Interceptors;
 using TaskBoard.Api.Services;
 using TaskBoard.Api.Streaming;
@@ -20,6 +21,13 @@ builder.Services.AddGrpc(options =>
 // e.g. GET /v1/boards/5. It calls the very same service classes through the same gRPC pipeline,
 // so the interceptors, validation and status codes apply unchanged (NotFound -> 404, ...).
 .AddJsonTranscoding();
+
+// Swagger describes REST routes, which is why it needs the transcoding above: a plain gRPC service
+// has no URL/verb/JSON shape to document. AddGrpcSwagger reads the transcoded routes; the page itself
+// is only served in Development (below).
+builder.Services.AddGrpcSwagger();
+builder.Services.AddSwaggerGen(options =>
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "TaskBoard API", Version = "v1" }));
 
 // Singleton, not scoped: the open WatchBoard streams and the services that publish events
 // live in different requests but must share one subscriber list.
@@ -55,6 +63,12 @@ app.UseCors(AngularDevClient);
 // Unwraps gRPC-Web requests (browser-compatible HTTP/1.1 framing) back into the plain
 // gRPC calls our services already implement - the service code itself needs no changes.
 app.UseGrpcWeb(new GrpcWebOptions { DefaultEnabled = true });
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "TaskBoard API v1"));
+}
 
 // Configure the HTTP request pipeline.
 app.MapGrpcService<LabelGrpcService>();

@@ -178,6 +178,20 @@ public class RestTranscodingTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Swagger_DocumentListsTheRestRoutesButNotTheStream()
+    {
+        var response = await _http.GetAsync("/swagger/v1/swagger.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var paths = Json(response).GetProperty("paths");
+        Assert.True(paths.TryGetProperty("/v1/boards/{id}", out var board));
+        Assert.True(board.TryGetProperty("get", out _));
+        Assert.True(paths.TryGetProperty("/v1/tasks/{id}", out var task));
+        Assert.True(task.TryGetProperty("patch", out _));
+        Assert.DoesNotContain("watch", paths.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         _http.Dispose();
