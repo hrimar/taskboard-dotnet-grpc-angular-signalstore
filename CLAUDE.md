@@ -29,9 +29,15 @@ npm run build             # runs proto:gen first (prebuild)
 npm run proto:gen         # regenerate TS clients from the .proto files
 npm test                  # Karma/Jasmine
 npx ng test --watch=false --browsers=ChromeHeadless --include src/app/boards/**/*.spec.ts   # single spec / folder
+npm run e2e               # Playwright e2e (starts its own API + ng serve, see below)
+npx playwright test e2e/tasks.spec.ts --headed   # single e2e spec, visible browser
+npx playwright show-report
 ```
 
-CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. The backend job also runs `dotnet test` (xUnit project `tests/TaskBoard.Api.Tests`: mapping unit tests + gRPC integration tests over `WebApplicationFactory<Program>` with an in-memory SQLite database per test); Playwright tests are planned.
+CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. The backend job also runs `dotnet test` (xUnit project `tests/TaskBoard.Api.Tests`: mapping unit tests + gRPC integration tests over `WebApplicationFactory<Program>` with an in-memory SQLite database per test). The `e2e` job runs Playwright and uploads `playwright-report/` as an artifact.
+
+**E2E** (`client/taskboard-web/e2e/`, `playwright.config.ts`): isolated from the dev servers - API on **:5180** (`e2e/start-api.mjs`: Release build, fresh `e2e/e2e.db`, `Database__MigrateOnStartup=true`, CORS for :4300) and `ng serve --configuration e2e` on **:4300** (`environment.e2e.ts`). CDK drag-drop needs manual mouse steps (`dragCard` in `e2e/support.ts`), `locator.dragTo` does not trigger it. Wait for the "Live" status before testing stream updates.
+**Playwright MCP** (`.mcp.json`) is for exploring the UI only: its browser buffers streaming responses, so the WatchBoard chip never leaves "Connecting…" there - that is not an app bug, verify streaming with `npx playwright test`.
 
 ## Architecture
 
