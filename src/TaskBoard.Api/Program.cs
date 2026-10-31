@@ -62,6 +62,15 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Opt-in, off by default: dev and production databases are migrated deliberately with
+// `dotnet ef database update`. The Playwright e2e run turns it on because it starts every run
+// on a brand-new SQLite file, which needs the schema before the first request arrives.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    scope.ServiceProvider.GetRequiredService<TaskBoardDbContext>().Database.Migrate();
+}
+
 app.UseCors(AngularDevClient);
 
 // Unwraps gRPC-Web requests (browser-compatible HTTP/1.1 framing) back into the plain
