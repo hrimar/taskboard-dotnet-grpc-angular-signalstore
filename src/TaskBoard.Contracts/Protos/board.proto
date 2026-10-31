@@ -5,6 +5,7 @@ package taskboard.v1;
 import "google/protobuf/empty.proto"; 
 import "google/protobuf/timestamp.proto";
 import "taskitem.proto";
+import "google/api/annotations.proto";
 
 option csharp_namespace = "TaskBoard.Contracts.V1";
 
@@ -17,24 +18,39 @@ message Board {
 
 // The service definition
 service BoardService  {
+    // The google.api.http options map each RPC to a REST route (JSON transcoding): {id} in the path
+    // fills the field of the same name in the request message, `body: "*"` reads the remaining
+    // fields from the JSON body. They only ADD a way in; the gRPC contract itself is unchanged.
+
     // Create
-    rpc CreateBoard(CreateBoardRequest) returns (Board);
+    rpc CreateBoard(CreateBoardRequest) returns (Board) {
+        option (google.api.http) = { post: "/v1/boards" body: "*" };
+    }
 
     // Read single
-    rpc GetBoard(GetBoardRequest) returns (Board);
+    rpc GetBoard(GetBoardRequest) returns (Board) {
+        option (google.api.http) = { get: "/v1/boards/{id}" };
+    }
 
     // Read list
-    rpc ListBoards(ListBoardsRequest) returns (ListBoardsResponse);
+    rpc ListBoards(ListBoardsRequest) returns (ListBoardsResponse) {
+        option (google.api.http) = { get: "/v1/boards" };
+    }
 
-    // Update
-    rpc UpdateBoard(UpdateBoardRequest) returns (Board);
+    // Update (PATCH: only the fields present in the JSON body change)
+    rpc UpdateBoard(UpdateBoardRequest) returns (Board) {
+        option (google.api.http) = { patch: "/v1/boards/{id}" body: "*" };
+    }
 
     // Delete
-    rpc DeleteBoard(DeleteBoardRequest) returns (google.protobuf.Empty);
+    rpc DeleteBoard(DeleteBoardRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = { delete: "/v1/boards/{id}" };
+    }
 
     // Server streaming: stays open and pushes an event whenever a task on the board is
     // created, updated or deleted. It sends changes only - no initial snapshot - so a client
     // loads the current tasks with ListTaskItems and (re)syncs that way after every reconnect.
+    // Deliberately has no REST route: a long-lived stream is not request/response JSON.
     rpc WatchBoard(WatchBoardRequest) returns (stream BoardEvent);
 }
 

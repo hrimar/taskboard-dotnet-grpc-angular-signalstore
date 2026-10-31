@@ -114,20 +114,25 @@ public class TaskItemGrpcService : TaskItemService.TaskItemServiceBase
 
         // Everything that can reject the request runs BEFORE the entity is touched, so a failure
         // never leaves a half-applied change on the tracked entity.
-        var unknownPath = request.UpdateMask.Paths.FirstOrDefault(path => !UpdatablePaths.Contains(path));
+        // The transcoder passes a REST query like ?updateMask=labelIds through as written, but the
+        // paths below are the proto (snake_case) names. JSON shows camelCase names, so a REST caller
+        // naturally sends those; normalising accepts both and leaves gRPC callers (snake_case) unchanged.
+        var paths = request.UpdateMask.Paths.Select(RequestValidation.ToSnakeCase).ToList();
+
+        var unknownPath = paths.FirstOrDefault(path => !UpdatablePaths.Contains(path));
         if (unknownPath is not null)
             throw new RpcException(new Status(StatusCode.InvalidArgument, $"Unknown update_mask path '{unknownPath}'."));
 
-        if (request.UpdateMask.Paths.Contains("title"))
+        if (paths.Contains("title"))
             RequestValidation.RequireTitle(request.TaskItem.Title);
 
-        var labels = request.UpdateMask.Paths.Contains("label_ids")
+        var labels = paths.Contains("label_ids")
             ? await ResolveLabelsAsync(request.TaskItem.LabelIds, context.CancellationToken)
             : null;
 
         // FieldMask-driven update: only the paths the client listed get applied - everything
         // else in request.TaskItem is ignored, even if it carries a value.
-        foreach (var path in request.UpdateMask.Paths)
+        foreach (var path in paths)
         {
             switch (path)
             {

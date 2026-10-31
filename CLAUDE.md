@@ -40,6 +40,8 @@ CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. The bac
 - TypeScript: `client/taskboard-web/tools/generate-proto.mjs` runs protoc + `@protobuf-ts/plugin` into `src/app/core/proto-gen/` (gitignored, regenerated on every start/build). **A new `.proto` file must be added to the `protoFiles` list in that script.**
 - Never hand-edit `proto-gen/` or `Persistence/Migrations/`. Keep proto changes backward-compatible (don't renumber or reuse field numbers; enums start with a `*_UNSPECIFIED = 0`).
 
+**REST / Swagger.** `google.api.http` options on the RPCs (routes under `/v1/...`) plus `AddJsonTranscoding()` expose the same service classes as REST/JSON; `AddGrpcSwagger()` documents them at `/swagger` (Development only). `WatchBoard` has no route on purpose. `Protos/google/api/*.proto` are vendored copies from googleapis (needed for the option) - don't edit them; they are not in `protoFiles` because they are only imported. A new RPC that should be reachable over REST needs its own `google.api.http` option.
+
 **Server layers** (`src/`): `Api` → `Application` → `Domain`, plus `Infrastructure` (EF Core). Domain has no dependencies.
 - `Api/Services/*GrpcService.cs` override the generated `*Service.*ServiceBase`, use `TaskBoardDbContext` directly and signal errors with `RpcException` + proper `StatusCode` (`NotFound`, `InvalidArgument`, …). Registered with `MapGrpcService<>` in `Program.cs`.
 - `Application/Mapping/*MappingExtensions.cs` hold all proto ↔ domain conversion (`ToProto()`, `ToDomain()`, `ApplyTo(entity)` for updates). Domain and proto types share names, so these files use `using Domain… =` aliases. Mappings that need DB access (board existence, label resolution) stay in the service.

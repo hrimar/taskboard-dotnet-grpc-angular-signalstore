@@ -62,6 +62,41 @@ npm start      # generates the gRPC clients from the .proto files first, then ng
 
 Tests and build commands for both sides: `dotnet test TaskBoard.sln` for the API, and see [client/taskboard-web/README.md](client/taskboard-web/README.md) for the client.
 
+## REST and Swagger (JSON transcoding)
+The same service classes also answer plain REST/JSON, so `curl`, scripts and other HTTP clients can use the API without a gRPC client. Routes come from `google.api.http` options in the `.proto` files; there is no second implementation, so the interceptors, validation and status codes are the same (`NotFound` becomes 404, `InvalidArgument` 400, `Aborted` 409, ...). `WatchBoard` is gRPC-only on purpose - a long-lived stream is not request/response JSON.
+
+Transcoding is enabled in every environment and, like the gRPC endpoints, the API has no authentication (a deliberate scope limit of this learning project). Only Swagger is Development-only.
+
+With the API running in Development, **Swagger UI** is at <http://localhost:5063/swagger>. It documents exactly the REST routes, which is why it needs transcoding: a plain gRPC service has no URL/verb/JSON shape to describe.
+
+```bash
+curl -X POST http://localhost:5063/v1/boards -H "Content-Type: application/json" -d '{"name":"Sprint 1"}'
+curl http://localhost:5063/v1/boards
+curl -X POST http://localhost:5063/v1/boards/1/tasks -H "Content-Type: application/json" -d '{"title":"Write docs","status":"TASK_ITEM_STATUS_TODO"}'
+# FieldMask over REST: the body carries the values, the query names the fields to apply
+# (camelCase as in the JSON, e.g. updateMask=dueDate,labelIds, or the snake_case proto names)
+curl -X PATCH "http://localhost:5063/v1/tasks/1?updateMask=status" -H "Content-Type: application/json" -d '{"status":"TASK_ITEM_STATUS_DONE"}'
+curl http://localhost:5063/v1/boards/999   # HTTP 404, JSON error body with "message": "Board 999 not found."
+```
+
+JSON follows the standard proto3 mapping: `camelCase` field names, enums as their proto names, `Timestamp` as an ISO-8601 string.
+
+### gRPC vs REST for the same data
+Measured on this API (uncompressed bodies, one board with 20 tasks; gRPC framing and HTTP headers are not counted):
+
+| Response | gRPC (protobuf) | REST (JSON) |
+|---|---|---|
+| One board | 44 B | 104 B |
+| 20 tasks of a board | 2131 B | 6384 B |
+
+Protobuf is about 2-3x smaller because field names are numbers and values are packed. JSON is readable in DevTools and works everywhere, protobuf needs the generated client (or the `.proto` file) to read. Compression narrows the size gap; it was not measured here.
+
+| | gRPC / gRPC-Web | REST via transcoding |
+|---|---|---|
+| Client needs | generated client or `.proto` | any HTTP client |
+| Best for | our Angular app, service-to-service | scripts, `curl`, third parties, Swagger |
+| Streaming | yes (`WatchBoard`) | no |
+
 ## Roadmap
 - [ ] 0. Repository setup (.gitignore, README)
 - [ ] 1. Solution and Angular skeleton, CORS + gRPC-Web

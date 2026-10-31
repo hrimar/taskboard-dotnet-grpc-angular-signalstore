@@ -5,6 +5,7 @@ package taskboard.v1;
 import "google/protobuf/empty.proto"; 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/field_mask.proto";
+import "google/api/annotations.proto";
 
 option csharp_namespace = "TaskBoard.Contracts.V1";
 
@@ -22,11 +23,34 @@ message TaskItem {
 }
 
 service TaskItemService {
-  rpc CreateTaskItem(CreateTaskItemRequest) returns (TaskItem);
-  rpc GetTaskItem(GetTaskItemRequest) returns (TaskItem);
-  rpc ListTaskItems(ListTaskItemsRequest) returns (ListTaskItemsResponse);
-  rpc UpdateTaskItem(UpdateTaskItemRequest) returns (TaskItem);
-  rpc DeleteTaskItem(DeleteTaskItemRequest) returns (google.protobuf.Empty);
+  rpc CreateTaskItem(CreateTaskItemRequest) returns (TaskItem) {
+    option (google.api.http) = { post: "/v1/boards/{board_id}/tasks" body: "*" };
+  }
+
+  rpc GetTaskItem(GetTaskItemRequest) returns (TaskItem) {
+    option (google.api.http) = { get: "/v1/tasks/{id}" };
+  }
+
+  // board_id is optional here (0 = every board), hence the second route without it.
+  // page_size and page_token travel as query parameters: GET /v1/tasks?pageSize=20&pageToken=...
+  rpc ListTaskItems(ListTaskItemsRequest) returns (ListTaskItemsResponse) {
+    option (google.api.http) = {
+      get: "/v1/boards/{board_id}/tasks"
+      additional_bindings { get: "/v1/tasks" }
+    };
+  }
+
+  // Only `task_item` is the JSON body; `update_mask` is a query parameter that names the fields to
+  // apply: PATCH /v1/tasks/7?updateMask=title,status
+  // The task that is updated is the one in the path (`id`); an `id` inside the body's `task_item`
+  // is ignored, as it is for gRPC callers.
+  rpc UpdateTaskItem(UpdateTaskItemRequest) returns (TaskItem) {
+    option (google.api.http) = { patch: "/v1/tasks/{id}" body: "task_item" };
+  }
+
+  rpc DeleteTaskItem(DeleteTaskItemRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = { delete: "/v1/tasks/{id}" };
+  }
 }
 
 //

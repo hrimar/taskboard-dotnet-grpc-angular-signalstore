@@ -3,6 +3,7 @@ syntax = "proto3";
 package taskboard.v1;
 
 import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
 
 option csharp_namespace = "TaskBoard.Contracts.V1";
 
@@ -15,19 +16,29 @@ message Label{
 // The service definition.
 service LabelService  {
     // Create
-    rpc CreateLabel(CreateLabelRequest) returns (Label);
+    rpc CreateLabel(CreateLabelRequest) returns (Label) {
+        option (google.api.http) = { post: "/v1/labels" body: "*" };
+    }
 
     // Read single
-    rpc GetLabel(GetLabelRequest) returns (Label);
+    rpc GetLabel(GetLabelRequest) returns (Label) {
+        option (google.api.http) = { get: "/v1/labels/{id}" };
+    }
 
     // Read list
-    rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse);
+    rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse) {
+        option (google.api.http) = { get: "/v1/labels" };
+    }
 
-    // Update
-    rpc UpdateLabel(UpdateLabelRequest) returns (Label);
+    // Update (PUT: replaces name AND color, the request has no optional fields)
+    rpc UpdateLabel(UpdateLabelRequest) returns (Label) {
+        option (google.api.http) = { put: "/v1/labels/{id}" body: "*" };
+    }
 
     // Delete
-    rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty);
+    rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = { delete: "/v1/labels/{id}" };
+    }
 }
 
 // The request message
