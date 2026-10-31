@@ -17,7 +17,10 @@ export default defineConfig({
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : [['html', { open: 'never' }]],
   use: {
     baseURL: webUrl,
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    // Attached to the HTML report: a red test shows what the page looked like when it failed,
+    // also on the first attempt (the trace only exists for the retry).
+    screenshot: 'only-on-failure'
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
