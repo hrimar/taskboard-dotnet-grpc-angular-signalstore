@@ -65,6 +65,8 @@ Tests and build commands for both sides: `dotnet test TaskBoard.sln` for the API
 ## REST and Swagger (JSON transcoding)
 The same service classes also answer plain REST/JSON, so `curl`, scripts and other HTTP clients can use the API without a gRPC client. Routes come from `google.api.http` options in the `.proto` files; there is no second implementation, so the interceptors, validation and status codes are the same (`NotFound` becomes 404, `InvalidArgument` 400, `Aborted` 409, ...). `WatchBoard` is gRPC-only on purpose - a long-lived stream is not request/response JSON.
 
+Transcoding is enabled in every environment and, like the gRPC endpoints, the API has no authentication (a deliberate scope limit of this learning project). Only Swagger is Development-only.
+
 With the API running in Development, **Swagger UI** is at <http://localhost:5063/swagger>. It documents exactly the REST routes, which is why it needs transcoding: a plain gRPC service has no URL/verb/JSON shape to describe.
 
 ```bash
@@ -72,6 +74,7 @@ curl -X POST http://localhost:5063/v1/boards -H "Content-Type: application/json"
 curl http://localhost:5063/v1/boards
 curl -X POST http://localhost:5063/v1/boards/1/tasks -H "Content-Type: application/json" -d '{"title":"Write docs","status":"TASK_ITEM_STATUS_TODO"}'
 # FieldMask over REST: the body carries the values, the query names the fields to apply
+# (camelCase as in the JSON, e.g. updateMask=dueDate,labelIds, or the snake_case proto names)
 curl -X PATCH "http://localhost:5063/v1/tasks/1?updateMask=status" -H "Content-Type: application/json" -d '{"status":"TASK_ITEM_STATUS_DONE"}'
 curl http://localhost:5063/v1/boards/999   # HTTP 404, JSON error body with "message": "Board 999 not found."
 ```

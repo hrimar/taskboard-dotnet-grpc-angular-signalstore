@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Grpc.Core;
 
 namespace TaskBoard.Api.Validation;
@@ -33,6 +34,10 @@ internal static class RequestValidation
 
         return offset;
     }
+
+    // "labelIds" -> "label_ids", "dueDate" -> "due_date"; names already in snake_case pass through.
+    public static string ToSnakeCase(string path) =>
+        Regex.Replace(path, "(?<=[a-z0-9])([A-Z])", "_$1").ToLowerInvariant();
 
     private static RpcException InvalidArgument(string message) =>
         new(new Status(StatusCode.InvalidArgument, message));

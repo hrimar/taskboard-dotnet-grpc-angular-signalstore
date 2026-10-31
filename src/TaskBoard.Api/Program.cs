@@ -23,11 +23,15 @@ builder.Services.AddGrpc(options =>
 .AddJsonTranscoding();
 
 // Swagger describes REST routes, which is why it needs the transcoding above: a plain gRPC service
-// has no URL/verb/JSON shape to document. AddGrpcSwagger reads the transcoded routes; the page itself
-// is only served in Development (below).
-builder.Services.AddGrpcSwagger();
-builder.Services.AddSwaggerGen(options =>
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "TaskBoard API", Version = "v1" }));
+// has no URL/verb/JSON shape to document. AddGrpcSwagger reads the transcoded routes. It is
+// Development-only as a whole (services here, middleware below): outside Development it would
+// reflect over every endpoint for a page nobody can open. Transcoding itself stays on everywhere.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddGrpcSwagger();
+    builder.Services.AddSwaggerGen(options =>
+        options.SwaggerDoc("v1", new OpenApiInfo { Title = "TaskBoard API", Version = "v1" }));
+}
 
 // Singleton, not scoped: the open WatchBoard streams and the services that publish events
 // live in different requests but must share one subscriber list.

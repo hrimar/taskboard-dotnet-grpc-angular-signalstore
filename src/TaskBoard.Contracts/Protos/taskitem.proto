@@ -42,6 +42,8 @@ service TaskItemService {
 
   // Only `task_item` is the JSON body; `update_mask` is a query parameter that names the fields to
   // apply: PATCH /v1/tasks/7?updateMask=title,status
+  // The task that is updated is the one in the path (`id`); an `id` inside the body's `task_item`
+  // is ignored, as it is for gRPC callers.
   rpc UpdateTaskItem(UpdateTaskItemRequest) returns (TaskItem) {
     option (google.api.http) = { patch: "/v1/tasks/{id}" body: "task_item" };
   }
