@@ -11,6 +11,10 @@
          "Both" (not "Server") so the integration tests can reuse the generated C# clients instead
          of compiling the protos a second time, which would duplicate the message types. -->
     <Protobuf Include="Protos\*.proto" GrpcServices="Both" ProtoRoot="Protos\" />
+
+    <!-- google/api/*.proto define the `google.api.http` option that maps an RPC to a REST route
+         (JSON transcoding). They are only imported for that option, so they define no services. -->
+    <Protobuf Include="Protos\google\api\*.proto" GrpcServices="None" ProtoRoot="Protos\" />
   </ItemGroup>
 
   <ItemGroup>

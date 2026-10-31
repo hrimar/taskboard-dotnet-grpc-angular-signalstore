@@ -15,7 +15,11 @@ builder.Services.AddGrpc(options =>
 {
     options.Interceptors.Add<LoggingInterceptor>();
     options.Interceptors.Add<ExceptionInterceptor>();
-});
+})
+// Serves the RPCs that carry a google.api.http option (see the .proto files) also as plain REST/JSON,
+// e.g. GET /v1/boards/5. It calls the very same service classes through the same gRPC pipeline,
+// so the interceptors, validation and status codes apply unchanged (NotFound -> 404, ...).
+.AddJsonTranscoding();
 
 // Singleton, not scoped: the open WatchBoard streams and the services that publish events
 // live in different requests but must share one subscriber list.
