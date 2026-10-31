@@ -50,6 +50,8 @@ CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. The bac
 
 **Server layers** (`src/`): `Api` → `Application` → `Domain`, plus `Infrastructure` (EF Core). Domain has no dependencies.
 - `Api/Services/*GrpcService.cs` override the generated `*Service.*ServiceBase`, use `TaskBoardDbContext` directly and signal errors with `RpcException` + proper `StatusCode` (`NotFound`, `InvalidArgument`, …). Registered with `MapGrpcService<>` in `Program.cs`.
+- Interceptors (`Api/Interceptors/`) run in registration order, first = outermost: `LoggingInterceptor` wraps `ExceptionInterceptor`, so the log shows the status the client receives. `ExceptionInterceptor` turns unexpected exceptions into a generic `Internal` (`DbUpdateConcurrencyException` → `Aborted`); a thrown `RpcException` passes through. Input checks live in `Api/Validation/RequestValidation.cs` and run before any entity is changed.
+- `WatchBoard` streaming: `Api/Streaming/BoardEventBroadcaster.cs` (singleton, one bounded `Channel<T>` per subscriber, overflow → `ResourceExhausted`). Services publish only after `SaveChangesAsync` succeeds.
 - `Application/Mapping/*MappingExtensions.cs` hold all proto ↔ domain conversion (`ToProto()`, `ToDomain()`, `ApplyTo(entity)` for updates). Domain and proto types share names, so these files use `using Domain… =` aliases. Mappings that need DB access (board existence, label resolution) stay in the service.
 - Two partial-update styles exist: `UpdateBoardRequest` uses `optional` fields; `UpdateTaskItemRequest` uses `google.protobuf.FieldMask`.
 - Timestamps are stored as UTC `DateTime`; mapping uses `DateTime.SpecifyKind(..., Utc)` before `Timestamp.FromDateTime`. Task labels are many-to-many and only mapped when loaded with `.Include(t => t.Labels)`.
@@ -62,6 +64,8 @@ CI (`.github/workflows/ci.yml`) builds and tests both sides on every PR. The bac
 
 **Client** (`client/taskboard-web/src/app`, standalone components, Angular Material):
 - `core/grpc/grpc-clients.provider.ts`: one `GrpcWebFetchTransport` shared by all generated clients, exposed as DI tokens `BOARD_CLIENT`, `LABEL_CLIENT`, `TASK_ITEM_CLIENT` (registered in `app.config.ts`). Inject tokens, never `new` a client.
-- State: NgRx SignalStore per feature in `<feature>/data-access/*.store.ts` (see `boards/data-access/boards.store.ts` as the reference pattern): `withEntities<T>()` + `withState` for `loading`/`error` + `withMethods` with `rxMethod`. Client calls return Promises – wrap with `from(client.x(req).response)`, and always handle results with `tapResponse` (a raw error would kill the `rxMethod` stream). Map errors through `RpcError.message`.
-- `AppComponent` is still a temporary smoke test; `app.routes.ts` is empty – feature routes/components are the next step.
+- State: NgRx SignalStore per feature in `<feature>/data-access/*.store.ts` (see `boards/data-access/boards.store.ts` as the reference pattern): `withEntities<T>()` + `withState` for `loading`/`error` + `withMethods` with `rxMethod`. Client calls return Promises – wrap with `from(client.x(req).response)`, and always handle results with `tapResponse` (a raw error would kill the `rxMethod` stream). Map errors through `toErrorMessage` (`core/grpc/rpc-error.ts`, reads `RpcError.message`).
+- Feature folders: `boards/`, `tasks/`, `labels/`, each split into `data-access` (stores), `feature` (routed pages) and `ui` (presentational components, dialogs); `shared/ui/confirm-dialog` is reused. Stores: `BoardsStore`, `TasksStore` (Kanban columns as computed signals, filters, optimistic move/delete with rollback), `LabelsStore`.
+- `tasks/data-access/watch-board.ts` wraps the `WatchBoard` stream as a cold Observable; `TasksStore` resyncs after every (re)connect and retries with exponential backoff.
+- `AppComponent` is the toolbar + `router-outlet` shell; `app.routes.ts` lazy-loads `boards` and `boards/:id`.
 
