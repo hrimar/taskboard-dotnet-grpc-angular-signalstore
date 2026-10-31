@@ -40,7 +40,15 @@ Run `ng generate component component-name` to generate a new component. You can 
 
 ## Running end-to-end tests
 
-End-to-end tests (Playwright) are planned but not set up yet.
+Playwright tests live in `e2e/`. Once per machine, install the browser: `npx playwright install chromium`. Then:
+
+```bash
+npm run e2e                  # headless; starts its own API (:5180, fresh e2e/e2e.db) and ng serve (:4300)
+npx playwright test --ui     # interactive mode, step through each test
+npx playwright show-report   # HTML report of the last run
+```
+
+The test servers use their own ports and database, so the run never touches the dev API (:5063), `taskboard.db` or `ng serve` (:4200), and works while those are running. Requires the .NET 8 SDK, because the API is started with `dotnet run`.
 
 ## Further help
 

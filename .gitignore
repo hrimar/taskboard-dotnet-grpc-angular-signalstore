@@ -63,6 +63,13 @@ dist/
 *.log
 npm-debug.log*
 
+# Playwright output (the e2e database e2e/e2e.db is covered by *.db below)
+playwright-report/
+test-results/
+blob-report/
+# Snapshots and console logs the Playwright MCP server writes into the workspace
+.playwright-mcp/
+
 # Local SQLite database (migrations are committed, the .db file is not)
 *.db
 *.db-shm
